@@ -1,0 +1,140 @@
+module cisco-virl {
+
+  namespace "http://com/example/ciscovirl";
+  prefix cisco-virl;
+
+  import tailf-ncs-ned {
+    prefix ned;
+  }
+
+  import tailf-common {
+    prefix tailf;
+  }
+
+  identity cisco-virl-id {
+    base ned:generic-ned-id;
+  }
+/*
+  grouping extensions-grouping {
+    container extensions {
+      list entry {
+        key "key";
+        leaf key {
+          type string;
+        }
+        leaf type {
+          type string;
+        }
+        leaf value {
+          type string;
+        }
+      }
+    }
+  }
+
+  container simulations {
+    list simulation {
+      key "name";
+      leaf name {
+        type string;
+      }
+      leaf status {
+        type string;
+      }
+      leaf launched {
+        type string;
+      }
+      leaf expires {
+        type string;
+      }
+      container topology {
+        uses extensions-grouping;
+      }
+      list node {
+        key "name";
+        leaf name {
+          type string;
+        }
+        leaf index {
+          type uint32;
+        }
+        leaf type {
+          type string;
+        }
+        leaf subtype {
+          type string;
+        }
+        leaf state {
+          type string;
+        }
+        uses extensions-grouping;
+        list interface {
+          key "id";
+          leaf id {
+            type uint32;
+          }
+          leaf name {
+            type string;
+          }
+          leaf ipv4 {
+            type string;
+          }
+          leaf netPrefixLenV4 {
+            type string;
+          }
+        }
+      }
+    }
+  }
+  container simulations {
+    list simulation {
+      key "name";
+      leaf name {
+        type string;
+      }
+      container topology {
+        list node {
+          key "name";
+          leaf name {
+            type string;
+          }
+          leaf state {
+            type string;
+          }
+        }
+      }
+    }
+  }
+*/
+/*
+  rpc my-cmd {
+    tailf:actionpoint ncsinternal {
+      tailf:internal;
+    }
+    input {
+      leaf a {
+        type int32;
+      }
+      leaf b {
+        type string;
+      }
+    }
+    output {
+      list  item {
+        leaf l1 {
+          type enumeration {
+            enum On;
+            enum Off;
+          }
+        }
+        leaf l2 {
+          type int32;
+        }
+      }
+    }
+  }
+*/
+}
+
+
+

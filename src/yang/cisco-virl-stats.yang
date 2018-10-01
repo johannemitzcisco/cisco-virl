@@ -1,0 +1,111 @@
+module cisco-virl-stats {
+
+  namespace "http://com/example/ciscovirl-stats";
+  prefix cisco-virlstats;
+
+  import tailf-common {
+    prefix tailf;
+  }
+
+  grouping extensions-grouping {
+    container extensions {
+      list entry {
+        key "key";
+        leaf key {
+          type string;
+        }
+        leaf type {
+          type string;
+        }
+        leaf value {
+          type string;
+        }
+      }
+    }
+  }
+
+  container simulations {
+    config false;
+    list simulation {
+      key "name";
+      leaf name {
+        type string;
+      }
+      leaf status {
+        type string;
+      }
+      leaf launched {
+        type string;
+      }
+      leaf expires {
+        type string;
+      }
+      container topology {
+        leaf name {
+          type string;
+        }
+        leaf annotation-xmlns {
+          type string;
+        }
+        leaf annotation-schemaVersion {
+          type string;
+        }
+        leaf annotation-xsiSchemaLocation {
+          type string;
+        }
+        leaf annotation-xmlnsXSI {
+          type string;
+        }
+        uses extensions-grouping;
+        list node {
+          key "name";
+          leaf name {
+            type string;
+          }
+          leaf connection-index {
+            type uint32;
+          }
+          leaf type {
+            type string;
+          }
+          leaf subtype {
+            type string;
+          }
+          leaf state {
+            type string;
+          }
+          uses extensions-grouping;
+          list interface {
+            key "id";
+            leaf id {
+              type uint32;
+            }
+            leaf connection-index {
+              type uint32;
+            }
+            leaf name {
+              type string;
+            }
+            leaf ipv4 {
+              type string;
+            }
+            leaf netPrefixLenV4 {
+              type string;
+            }
+          }
+        }
+        list connection {
+          key "src dst";
+          leaf src {
+            type string;
+          }
+          leaf dst {
+            type string;
+          }
+        }
+      }
+    }
+  }
+}
+
+

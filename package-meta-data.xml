@@ -1,0 +1,19 @@
+<ncs-package xmlns="http://tail-f.com/ns/ncs-packages">
+  <name>cisco-virl</name>
+  <package-version>1.0</package-version>
+  <description>Skeleton for a generic NED</description>
+  <ncs-min-version>4.7</ncs-min-version>
+
+  <component>
+    <name>MyDevice</name>
+    <ned>
+      <generic>
+        <ned-id xmlns:n="http//com/example/ciscovirl">n:cisco-virl-id</ned-id>
+        <java-class-name>com.example.ciscovirl.ciscovirlNed</java-class-name>
+      </generic>
+      <device>
+        <vendor>Cisco</vendor>
+      </device>
+    </ned>
+  </component>
+</ncs-package>
