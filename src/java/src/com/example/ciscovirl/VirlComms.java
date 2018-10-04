@@ -7,10 +7,16 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.ContentType;
+import org.apache.http.StatusLine;
+import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.HttpEntity;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -40,7 +46,7 @@ public class VirlComms {
     private VirlComms comms;
     private ciscovirlNed ned;
 
-    private enum RequestType {
+    public enum RequestType {
         GET, POST;
     }
 
@@ -57,45 +63,73 @@ public class VirlComms {
                 .setDefaultCredentialsProvider(credsProvider)
                 .build();
     }
-    private String execRequest(Object requestType, String requestURL) throws IOException{
+    public String execRequest(Object requestType, String requestURL, String requestPayload) throws Exception {
         connect();
         String requestString = baseAPIURL+requestURL;
 System.out.println("EXEC ("+requestType.toString()+") REQUEST: " + requestURL);
         try {
-            HttpGet httpget = new HttpGet(requestString);
-            CloseableHttpResponse response = httpclient.execute(httpget);
-            try {
-                String responseStr = EntityUtils.toString(response.getEntity());
-System.out.println("REQUEST XML DATA: \n" + responseStr);
-                return responseStr;
-            } finally {
-                response.close();
+            String responseStr = null;
+            CloseableHttpResponse response = null;
+            if (requestType == RequestType.GET) {
+                HttpGet httpget = new HttpGet(requestString);
+                try {
+                    response = httpclient.execute(httpget);
+                    responseStr = EntityUtils.toString(response.getEntity());
+                    if (response.getStatusLine().getStatusCode() != 200) {
+System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
+                        throw new Exception(response.getStatusLine().toString());
+                    }
+                } finally {
+                    response.close();
+                }
+            } else if  (requestType == RequestType.POST) {
+                HttpPost httppost = new HttpPost(requestString);
+                if (requestPayload != null) {
+                    StringEntity payload = new StringEntity(requestPayload, ContentType.APPLICATION_XML);
+                    httppost.setEntity(payload);
+                }
+                try {
+                    response = httpclient.execute(httppost);
+                    responseStr = EntityUtils.toString(response.getEntity());
+                    if (response.getStatusLine().getStatusCode() != 200) {
+System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
+System.out.println("REQUEST PAYLOAD:\n" + requestPayload);
+                        throw new Exception(response.getStatusLine().toString());
+                    }
+                } finally {
+                    response.close();
+                }
             }
+            return responseStr;
         } finally {
             httpclient.close();
         }
     }
+    public String execRequest(Object requestType, String requestURL) throws Exception {
+        return execRequest(requestType, requestURL, null);
+    }
     public Document requestXMLData (String urlSuffix) throws Exception {
         String xml = execRequest(RequestType.GET, urlSuffix);
         return convertStringToDocument(xml);
-//         String json = XML.toJSONObject(xml).toString();
-// //        LOGGER.info(XML.toJSONObject(xml).toString(4));
-//         JsonObject retJsonObj = new JsonParser().parse(json).getAsJsonObject();
-//         String[] pathElements = jsonPath.split("/");
-//         for (String elem: pathElements) {
-//             retJsonObj = retJsonObj.getAsJsonObject().get(elem).getAsJsonObject();
-//         }
-//         return retJsonObj;
     }
-    public JsonObject requestJSONData (String urlSuffix, String jsonPath) throws IOException {
-        String json = execRequest(RequestType.GET, urlSuffix);
+    private JsonObject requestJSONData (Object requestType, String urlSuffix, String jsonPath, String payload) throws Exception {
+        String json = execRequest(requestType, urlSuffix, payload);
+System.out.println("RESPONSE:\n" + json);
         JsonObject retJsonObj = new JsonParser().parse(json).getAsJsonObject();
+        if (jsonPath == null) return retJsonObj;
         String[] pathElements = jsonPath.split("/");
         for (String elem: pathElements) {
             retJsonObj = retJsonObj.getAsJsonObject().get(elem).getAsJsonObject();
         }
         return retJsonObj;
     }
+    public JsonObject requestJSONData (String urlSuffix, String jsonPath) throws Exception {
+        return requestJSONData(RequestType.GET, urlSuffix, jsonPath, null);
+    }
+    // public String requestExecuteCommand (String urlSuffix, String payload) throws Exception {
+    //     return execRequest(RequestType.POST, urlSuffix, payload);
+    //     // return requestJSONData(RequestType.POST, urlSuffix, jsonPath, payload);
+    // }
     private static Document convertStringToDocument(String xmlStr) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();  
         DocumentBuilder builder;  

@@ -16,4 +16,11 @@
       </device>
     </ned>
   </component>
+
+  <component>
+    <name>VirlDesing</name>
+    <application>
+      <python-class-name>virl.VirlDesign.Main</python-class-name>
+    </application>
+  </component>
 </ncs-package>

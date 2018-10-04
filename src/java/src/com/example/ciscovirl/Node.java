@@ -29,17 +29,25 @@ public class Node implements StatsList {
     private String type;
     private String subtype;
     private String state;
+    private String excludeFromLaunch = "false";
+    private String location = "50,50";
     private Extensions extensions;
     @SerializedName("interface") public ArrayList<Interface> interfaces;
 
 	public Node(Element topoDeviceNode, int index) throws Exception {
         this.interfaces = new ArrayList<Interface>();
 		this.connectionIndex = new Integer(index);
-		VirlComms.nodeToString(topoDeviceNode);
+//		VirlComms.nodeToString(topoDeviceNode);
     	NamedNodeMap attributes = topoDeviceNode.getAttributes();
     	this.name = attributes.getNamedItem("name").getTextContent();
     	this.type = attributes.getNamedItem("type").getTextContent();
-    	this.subtype = attributes.getNamedItem("subtype").getTextContent();
+        this.subtype = attributes.getNamedItem("subtype").getTextContent();
+        if (attributes.getNamedItem("location") != null) this.location = attributes.getNamedItem("location").getTextContent();
+        if (attributes.getNamedItem("excludeFromLaunch") != null) 
+            System.out.println("Node: "+this.name+" excludeFromLaunch: "+attributes.getNamedItem("excludeFromLaunch").getTextContent());
+        else 
+            System.out.println("Node: "+this.name+" excludeFromLaunch: NOT SET");
+        if (attributes.getNamedItem("excludeFromLaunch") != null) this.excludeFromLaunch = attributes.getNamedItem("excludeFromLaunch").getTextContent();
     	Element extensionNode = (Element) topoDeviceNode.getElementsByTagName("extensions").item(0);
         this.extensions = new Extensions(extensionNode);
         NodeList interfaceNodes = topoDeviceNode.getElementsByTagName("interface");
@@ -66,6 +74,8 @@ public class Node implements StatsList {
         if (this.connectionIndex != null) maapi.setElem(tHandle, this.connectionIndex.toString(), new ConfPath(nodePath.toString()+"/connection-index"));
         if (this.type != null) maapi.setElem(tHandle, this.type, new ConfPath(nodePath.toString()+"/type"));
         if (this.subtype != null) maapi.setElem(tHandle, this.subtype, new ConfPath(nodePath.toString()+"/subtype"));
+        if (this.location != null) maapi.setElem(tHandle, this.location, new ConfPath(nodePath.toString()+"/location"));
+        if (this.excludeFromLaunch != null) maapi.setElem(tHandle, this.excludeFromLaunch, new ConfPath(nodePath.toString()+"/excludeFromLaunch"));
         if (this.state != null) maapi.setElem(tHandle, this.state, new ConfPath(nodePath.toString()+"/state"));
         if (this.extensions != null) 
         	this.extensions.saveToNSOLiveStatus(maapi, tHandle, nodePath);

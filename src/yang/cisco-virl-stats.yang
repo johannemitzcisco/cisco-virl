@@ -3,9 +3,7 @@ module cisco-virl-stats {
   namespace "http://com/example/ciscovirl-stats";
   prefix cisco-virlstats;
 
-  import tailf-common {
-    prefix tailf;
-  }
+  import tailf-common { prefix tailf; }
 
   grouping extensions-grouping {
     container extensions {
@@ -20,6 +18,77 @@ module cisco-virl-stats {
         leaf value {
           type string;
         }
+      }
+    }
+  }
+
+  grouping topology-grouping {
+    leaf name {
+      type string;
+    }
+    leaf annotation-xmlns {
+      type string;
+    }
+    leaf annotation-schemaVersion {
+      type string;
+    }
+    leaf annotation-xsiSchemaLocation {
+      type string;
+    }
+    leaf annotation-xmlnsXSI {
+      type string;
+    }
+    uses extensions-grouping;
+    list node {
+      key "name";
+      leaf name {
+        type string;
+      }
+      leaf connection-index {
+        type uint32;
+      }
+      leaf type {
+        type string;
+      }
+      leaf subtype {
+        type string;
+      }
+      leaf state {
+        type string;
+      }
+      leaf excludeFromLaunch {
+        type string;
+      }
+      leaf location {
+        type string;
+      }
+      uses extensions-grouping;
+      list interface {
+        key "id";
+        leaf id {
+          type uint32;
+        }
+        leaf connection-index {
+          type uint32;
+        }
+        leaf name {
+          type string;
+        }
+        leaf ipv4 {
+          type string;
+        }
+        leaf netPrefixLenV4 {
+          type string;
+        }
+      }
+    }
+    list connection {
+      key "src dst";
+      leaf src {
+        type string;
+      }
+      leaf dst {
+        type string;
       }
     }
   }
@@ -41,68 +110,7 @@ module cisco-virl-stats {
         type string;
       }
       container topology {
-        leaf name {
-          type string;
-        }
-        leaf annotation-xmlns {
-          type string;
-        }
-        leaf annotation-schemaVersion {
-          type string;
-        }
-        leaf annotation-xsiSchemaLocation {
-          type string;
-        }
-        leaf annotation-xmlnsXSI {
-          type string;
-        }
-        uses extensions-grouping;
-        list node {
-          key "name";
-          leaf name {
-            type string;
-          }
-          leaf connection-index {
-            type uint32;
-          }
-          leaf type {
-            type string;
-          }
-          leaf subtype {
-            type string;
-          }
-          leaf state {
-            type string;
-          }
-          uses extensions-grouping;
-          list interface {
-            key "id";
-            leaf id {
-              type uint32;
-            }
-            leaf connection-index {
-              type uint32;
-            }
-            leaf name {
-              type string;
-            }
-            leaf ipv4 {
-              type string;
-            }
-            leaf netPrefixLenV4 {
-              type string;
-            }
-          }
-        }
-        list connection {
-          key "src dst";
-          leaf src {
-            type string;
-          }
-          leaf dst {
-            type string;
-          }
-        }
+        uses topology-grouping;
       }
     }
   }

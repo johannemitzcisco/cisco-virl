@@ -23,12 +23,12 @@ public class Entry {
     private String value;
     public Entry(org.w3c.dom.Element node) throws Exception {
 System.out.println("NEW ENTRY: "+node.getNodeType()+": "+node.getNodeName()+": "+node.getParentNode().getNodeName());
-		VirlComms.nodeToString(node);
-    	NamedNodeMap attributes = node.getAttributes();
+		// VirlComms.nodeToString(node);
+   	NamedNodeMap attributes = node.getAttributes();
     	this.key = attributes.getNamedItem("key").getTextContent().replace(" ", "&nbsp");
     	this.type = attributes.getNamedItem("type").getTextContent();
     	this.value = node.getTextContent();
-System.out.println(this.toString());
+//System.out.println(this.toString());
     }
     public void saveToNSOLiveStatus(Maapi maapi, int tHandle, ConfPath path) throws Exception {
         ConfPath newPath = new ConfPath(path.toString()+"/extensions/entry{"+this.key+"}");

@@ -1,5 +1,5 @@
 all: javac
-.PHONY: all
+.PHONY: all .FORCE
 
 # Include standard NCS examples build definitions and rules
 include $(NCS_DIR)/src/ncs/build/include.ncs.mk
@@ -20,18 +20,23 @@ DIRS = ncsc-out ../load-dir ../shared-jar ../private-jar \
        java/src/$(JDIR)/$(NS)
 NFXS = ncsc-out/modules/fxs
 
-fxs: $(DIRS) $(NFXS)/cisco-virl.fxs $(NFXS)/cisco-virl-stats.fxs
+FXS = $(SRC:yang/%.yang=../load-dir/%.fxs)
+PYTHONSRC = $(wildcard ../python/virl/*.py)
+YANGPATH += ncsc-out/modules/yang
+# 	../../<pkt-name>/src/yang
+NCSCPATH   = $(YANGPATH:%=--yangpath %)
+
+
+
+fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl-stats.fxs $(NFXS)/cisco-virl.fxs $(FXS)
+# fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(FXS)
 .PHONY: fxs
+
+$(PYTHONSRC): .FORCE
+	python -m py_compile $@
 
 $(DIRS):
 	mkdir -p $@
-
-$(NFXS)/cisco-virl.fxs: yang/cisco-virl.yang
-	$(NCSC) --ncs-compile-module $< \
-	        --ncs-device-dir ncsc-out \
-	        --ncs-skip-statistics \
-	        --ncs-device-type generic-ned && cp $@ ../load-dir
-	$(NCSC) $(JFLAGS)/ciscovirl.java $@
 
 $(NFXS)/cisco-virl-stats.fxs: yang/cisco-virl-stats.yang
 	$(NCSC) --ncs-compile-module $< \
@@ -40,7 +45,20 @@ $(NFXS)/cisco-virl-stats.fxs: yang/cisco-virl-stats.yang
 	        --ncs-device-type generic-ned && cp $@ ../load-dir
 	$(NCSC) $(JFLAGS)/ciscovirlStats.java $@
 
-javac: fxs
+$(NFXS)/cisco-virl.fxs: yang/cisco-virl.yang
+	$(NCSC) --ncs-compile-module $< \
+	        --ncs-device-dir ncsc-out \
+	        --ncs-skip-statistics \
+	        --ncs-device-type generic-ned && cp $@ ../load-dir
+	$(NCSC) $(JFLAGS)/ciscovirl.java $@
+
+../load-dir/%.fxs: yang/%.yang
+	$(NCSC)  `ls $*-ann.yang  > /dev/null 2>&1 && echo "-a $*-ann.yang"` \
+             $(NCSCPATH) -c -o $@ $<
+
+.PHONY: alljava
+
+javac: fxs 
 	cp ../../java-lib/*.jar ../private-jar
 	cd java && ant -q all
 .PHONY: javac

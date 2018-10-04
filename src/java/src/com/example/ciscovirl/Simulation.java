@@ -71,7 +71,7 @@ public class Simulation implements StatsList {
     }
     public void setTopologyDoc(Document topologyDoc) throws Exception {
         this.topologyDoc = topologyDoc;
-        VirlComms.docToString(topologyDoc);
+//        VirlComms.docToString(topologyDoc);
         String toponame = this.name;
         if (toponame.contains("-")) {
             toponame = toponame.substring(0, toponame.lastIndexOf("-"));

@@ -20,8 +20,8 @@ public class StatsListFactory {
 			String nodeName = Node.getName(path);
 			for (Node node: simulation.topology.nodes) {
 				if (node.getName().equals(nodeName)) {
-					for (Interface interface: node.interfaces) {
-						list.add(interface);
+					for (Interface interf : node.interfaces) {
+						list.add(interf);
 					}
 				}
 				break;

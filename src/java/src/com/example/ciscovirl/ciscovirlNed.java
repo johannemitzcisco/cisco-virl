@@ -458,31 +458,45 @@ public class ciscovirlNed extends NedGenericBase  {
         throws NedException, IOException {
 
         try {
-            LOGGER.info("RUNNING COMMAND => " + cmdname);
+            LOGGER.info("RUNNING COMMAND ==> " + cmdname);
 
-/*            // Find schema node for the Enumeration in the rpc reply
-            MaapiSchemas.CSNode ecs = ciscovirlNed.schemas.findCSNode(
-                        ciscovirlNed.rpcCs, ciscovirl.uri, "my-cmd");
-            ecs = ciscovirlNed.schemas.findCSNode(ecs, ciscovirl.uri, "item");
-            ecs = ciscovirlNed.schemas.findCSNode(ecs, ciscovirl.uri, "l1");
-
-            ConfNamespace x = new ciscovirl();
-            worker.commandResponse(
-                new ConfXMLParam[] {
-                    new ConfXMLParamStart(x, "item"),
-                    new ConfXMLParamValue(
-                        x, "l1",
-                        ciscovirlNed.schemas.stringToValue(ecs.getType(), "On")),
-                    new ConfXMLParamValue(x, "l2",new ConfInt32(44)),
-                    new ConfXMLParamStop(x, "item"),
-
-                    new ConfXMLParamStart(x, "item"),
-                    new ConfXMLParamValue(
-                        x, "l1",
-                        ciscovirlNed.schemas.stringToValue(ecs.getType(), "Off")),
-                    new ConfXMLParamValue(x, "l2",new ConfInt32(33)),
-                    new ConfXMLParamStop(x, "item")
-                });*/
+            ConfNamespace ns = new ciscovirl();
+            ConfXMLParam[] result = null;
+            if (cmdname.equals("Start-Simulation")) {
+                String topologyName = null;
+                String topologyXML = null;
+                for (ConfXMLParam param : p) {
+                    if (param.getTag().equals("topology-name")) {
+                        topologyName = param.getValue().toString();
+                    }
+                    else if (param.getTag().equals("topology-xml")) {
+                        topologyXML = param.getValue().toString();
+                    }
+                   // LOGGER.info("INPUT PARAM NAME: "+param.getTag());
+                   // LOGGER.info("INPUT PARAM VALUE:\n"+param.getValue());
+                }
+                String reply = comms.execRequest(VirlComms.RequestType.POST, "/launch?session="+topologyName, topologyXML);
+                result = new ConfXMLParam[] {
+                    new ConfXMLParamValue(ns, "result", new ConfBuf("SUCCESS"))
+                    };
+            } else if (cmdname.equals("Stop-Simulation")) {
+                String simulationName = null;
+                for (ConfXMLParam param : p) {
+                    if (param.getTag().equals("simulation-name")) {
+                        simulationName = param.getValue().toString();
+                    }
+                    if (simulationName == null) throw new Exception ("Simulation Name cannot be null");
+                   // LOGGER.info("INPUT PARAM NAME: "+param.getTag());
+                   // LOGGER.info("INPUT PARAM VALUE:\n"+param.getValue());
+                }
+                String reply = comms.execRequest(VirlComms.RequestType.GET,"/stop/"+simulationName, null);
+                result = new ConfXMLParam[] {
+                    new ConfXMLParamValue(ns, "result", new ConfBuf("SUCCESS"))
+                    };
+            }
+            LOGGER.info("RUNNING COMMAND <== " + cmdname + " COMPLETED");
+            // if (result == null) worker.commandResponse();
+            worker.commandResponse(result);
         }
         catch (Exception e) {
             throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);

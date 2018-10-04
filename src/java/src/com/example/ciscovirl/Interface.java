@@ -20,7 +20,7 @@ import org.w3c.dom.NamedNodeMap;
 // import com.google.gson.JsonElement;
 // import com.google.gson.JsonObject;
 
-public class Interface {
+public class Interface implements StatsList {
     private Integer connectionIndex;
 	private Integer id;
 	private String name;
@@ -33,8 +33,8 @@ public class Interface {
         this.connectionIndex = new Integer(index);
         this.id = new Integer(attributes.getNamedItem("id").getTextContent());
         this.name = attributes.getNamedItem("name").getTextContent();
-        if (attributes.getNamedItem("ipv4") != null ) this.ipv4 = attributes.getNamedItem("ipv4").getTextContent();
-        if (attributes.getNamedItem("netPrefixLenV4") != null ) this.netPrefixLenV4 = attributes.getNamedItem("netPrefixLenV4").getTextContent();
+        if (attributes.getNamedItem("ipv4") != null) this.ipv4 = attributes.getNamedItem("ipv4").getTextContent();
+        if (attributes.getNamedItem("netPrefixLenV4") != null) this.netPrefixLenV4 = attributes.getNamedItem("netPrefixLenV4").getTextContent();
     }
     public static boolean isStatsListPath(ConfPath path) {
         return (path.toString().matches(".*/interface"));

@@ -33,7 +33,7 @@ public class Extensions {
 
 	public Extensions(org.w3c.dom.Element extensionsNode) throws Exception {
 		entrys = new ArrayList<Entry>();
-		VirlComms.nodeToString(extensionsNode);
+//		VirlComms.nodeToString(extensionsNode);
         NodeList entryNodes = extensionsNode.getElementsByTagName("entry");
 		for (int i = 0; i < entryNodes.getLength(); i++) {
 	        org.w3c.dom.Element node = (Element) entryNodes.item(i);

@@ -1,0 +1,85 @@
+module cisco-virl-design {
+
+  namespace "http://com/example/ciscovirl-design";
+  prefix cisco-virl-design;
+
+  import tailf-common { prefix tailf; }
+  import tailf-ncs { prefix ncs; }
+  import cisco-virl-stats { prefix cisco-virl-stats; }
+
+  container virl {
+    tailf:info "VIRL designer with services to manage VIRL topologies";
+    list topology {
+      key "name";
+      uses cisco-virl-stats:live_ncs_topology-grouping;
+      tailf:action Start-Simulation {
+        tailf:actionpoint StartSimulation-action;
+        input {
+          leaf virl-server {
+            type leafref {
+              path "/ncs:devices/ncs:device/ncs:name";
+            }
+          }
+        }
+        output {
+          leaf result {
+            type string; 
+          }
+        }
+      }
+    }
+    tailf:action loadDesignFromVirlServer {
+      tailf:actionpoint loadRunningVirlTopology-action;
+      input {
+        leaf virl-server {
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+        leaf simulation-name {
+          type leafref {
+            path "/ncs:devices/ncs:device[ncs:name = current()/../virl-server]/ncs:live-status/cisco-virl-stats:simulations/cisco-virl-stats:simulation/cisco-virl-stats:name";
+          }
+          when "../virl-server";
+        }
+        leaf topology-name {
+          tailf:info "Name of the new topopolgy";
+          type string;
+          tailf:non-strict-leafref {
+            path "/ncs:devices/ncs:device[ncs:name = current()/../virl-server]/ncs:live-status/cisco-virl-stats:simulations/cisco-virl-stats:simulation[cisco-virl-stats:name = current()/../simulation-name]/cisco-virl-stats:topology/cisco-virl-stats:name";
+          }
+          when "../virl-server and ../simulation-name";
+        }
+      }
+      output {
+        leaf result {
+          type string; 
+        }
+      }
+    }
+    tailf:action Stop-Simulation {
+      tailf:actionpoint StopSimulation-action;
+      input {
+        leaf virl-server {
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+        leaf simulation-name {
+          type leafref {
+            path "/ncs:devices/ncs:device[ncs:name = current()/../virl-server]/ncs:live-status/cisco-virl-stats:simulations/cisco-virl-stats:simulation/cisco-virl-stats:name";
+          }
+          when "../virl-server";
+        }
+      }
+      output {
+        leaf result {
+          type string; 
+        }
+      }
+    }
+  }
+}
+
+
+

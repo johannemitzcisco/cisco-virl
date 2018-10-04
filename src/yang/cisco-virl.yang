@@ -3,138 +3,60 @@ module cisco-virl {
   namespace "http://com/example/ciscovirl";
   prefix cisco-virl;
 
-  import tailf-ncs-ned {
-    prefix ned;
-  }
-
-  import tailf-common {
-    prefix tailf;
-  }
+  import tailf-ncs-ned { prefix ned; }
+  import tailf-common { prefix tailf; }
+  import tailf-ncs { prefix ncs; }
+  import cisco-virl-stats { prefix cisco-virl-stats; }
 
   identity cisco-virl-id {
     base ned:generic-ned-id;
   }
-/*
-  grouping extensions-grouping {
-    container extensions {
-      list entry {
-        key "key";
-        leaf key {
-          type string;
-        }
-        leaf type {
-          type string;
-        }
-        leaf value {
-          type string;
-        }
-      }
-    }
-  }
 
-  container simulations {
-    list simulation {
-      key "name";
-      leaf name {
-        type string;
+  container commands {
+    tailf:action Start-Simulation {
+      tailf:actionpoint ncsinternal {
+        tailf:internal;
       }
-      leaf status {
-        type string;
-      }
-      leaf launched {
-        type string;
-      }
-      leaf expires {
-        type string;
-      }
-      container topology {
-        uses extensions-grouping;
-      }
-      list node {
-        key "name";
-        leaf name {
+      input {
+        leaf topology-name {
+          mandatory true;
           type string;
         }
-        leaf index {
-          type uint32;
-        }
-        leaf type {
+        leaf topology-xml {
+          mandatory true;
           type string;
         }
-        leaf subtype {
-          type string;
+      }
+      output {
+        leaf result {
+          type string; 
         }
-        leaf state {
+      }
+    }
+
+    tailf:action Stop-Simulation {
+      tailf:display-when "not(../ncs:module) or ../ncs:module[ncs:name='cisco-virl']";
+      tailf:actionpoint ncsinternal {
+        tailf:internal;
+      }
+      input {
+        leaf simulation-name {
+          mandatory true;
           type string;
+//          type leafref {
+//            path "../../../ncs:live-status/cisco-virl-stats:simulations/cisco-virl-stats:simulation/cisco-virl-stats:name";
+//          }
         }
-        uses extensions-grouping;
-        list interface {
-          key "id";
-          leaf id {
-            type uint32;
-          }
-          leaf name {
-            type string;
-          }
-          leaf ipv4 {
-            type string;
-          }
-          leaf netPrefixLenV4 {
-            type string;
-          }
+      }
+      output {
+        leaf result {
+          type string; 
         }
       }
     }
   }
-  container simulations {
-    list simulation {
-      key "name";
-      leaf name {
-        type string;
-      }
-      container topology {
-        list node {
-          key "name";
-          leaf name {
-            type string;
-          }
-          leaf state {
-            type string;
-          }
-        }
-      }
-    }
-  }
-*/
-/*
-  rpc my-cmd {
-    tailf:actionpoint ncsinternal {
-      tailf:internal;
-    }
-    input {
-      leaf a {
-        type int32;
-      }
-      leaf b {
-        type string;
-      }
-    }
-    output {
-      list  item {
-        leaf l1 {
-          type enumeration {
-            enum On;
-            enum Off;
-          }
-        }
-        leaf l2 {
-          type int32;
-        }
-      }
-    }
-  }
-*/
 }
+
 
 
 
