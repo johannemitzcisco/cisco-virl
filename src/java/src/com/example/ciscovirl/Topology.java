@@ -120,20 +120,22 @@ public class Topology {
         if (!maapi.exists(tHandle, topologypath)) maapi.create(tHandle, topologypath);
 //System.out.println("TOPO NAME: "+this.name);
         if (this.name != null) maapi.setElem(tHandle, this.name, new ConfPath(topologypath.toString()+"/name"));
-        if (this.xmlns != null) maapi.setElem(tHandle, this.xmlns, new ConfPath(topologypath.toString()+"/annotation-xmlns"));
-        if (this.schemaVersion != null) maapi.setElem(tHandle, this.schemaVersion, new ConfPath(topologypath.toString()+"/annotation-schemaVersion"));
-        if (this.xsiSchemaLocation != null) maapi.setElem(tHandle, this.xsiSchemaLocation, new ConfPath(topologypath.toString()+"/annotation-xsiSchemaLocation"));
-        if (this.xmlnsXSI != null) maapi.setElem(tHandle, this.xmlnsXSI
-            , new ConfPath(topologypath.toString()+"/annotation-xmlnsXSI"));
-        this.extensions.saveToNSO(maapi, tHandle, new ConfPath(topologypath.toString()));
-        if (nodes != null) {
-            for (com.example.ciscovirl.Node n: this.nodes) {
-                n.saveToNSO(maapi, tHandle, topologypath);
+        if (!topologypath.toString().contains("live-status")) {
+            if (this.xmlns != null) maapi.setElem(tHandle, this.xmlns, new ConfPath(topologypath.toString()+"/annotation-xmlns"));
+            if (this.schemaVersion != null) maapi.setElem(tHandle, this.schemaVersion, new ConfPath(topologypath.toString()+"/annotation-schemaVersion"));
+            if (this.xsiSchemaLocation != null) maapi.setElem(tHandle, this.xsiSchemaLocation, new ConfPath(topologypath.toString()+"/annotation-xsiSchemaLocation"));
+            if (this.xmlnsXSI != null) maapi.setElem(tHandle, this.xmlnsXSI
+                , new ConfPath(topologypath.toString()+"/annotation-xmlnsXSI"));
+            this.extensions.saveToNSO(maapi, tHandle, new ConfPath(topologypath.toString()));
+            if (nodes != null) {
+                for (com.example.ciscovirl.Node n: this.nodes) {
+                    n.saveToNSO(maapi, tHandle, topologypath);
+                }
             }
-        }
-        if (connections != null) {
-            for (Connection c: this.connections) {
-                c.saveToNSO(maapi, tHandle, topologypath);
+            if (connections != null) {
+                for (Connection c: this.connections) {
+                    c.saveToNSO(maapi, tHandle, topologypath);
+                }
             }
         }
     }

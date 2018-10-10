@@ -70,6 +70,7 @@ public class Simulation implements StatsList {
         topology.saveToNSO(maapi, tHandle, new ConfPath(simPath.toString()+"/topology"));
     }
     public static String getName(ConfPath path) {
+System.out.println(path.toString());
         Pattern pattern = Pattern.compile("\\{(.*?)\\}");
         Matcher matcher = pattern.matcher(path.toString());
         matcher.find();

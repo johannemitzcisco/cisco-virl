@@ -15,13 +15,13 @@ import org.w3c.dom.Element;
 public class Entry {
     private String key;
     private String type;
-    private String value;
+    public String value;
 
     private String startXML = "<entry key=\"%s\" type=\"%s\">";
     private String endXml = "</entry> \n";
 
     public String toXML() {
-        String xml = String.format(this.startXML,this.key,this.type);
+        String xml = String.format(this.startXML,this.key.replace("&nbsp", " "),this.type);
         if (this.value != null) xml = xml + this.value;
         xml = xml + this.endXml;
         return xml;
@@ -40,6 +40,13 @@ public class Entry {
         this.key = entryModel.leaf(ciscovirl._key).valueAsString();
         this.type = entryModel.leaf(ciscovirl._type).valueAsString();
         this.value = entryModel.leaf(ciscovirl._value).valueAsString();
+    }
+    public static String getKey(NavuNode entry) throws NavuException {
+        return entry.leaf(ciscovirl._key).valueAsString();
+    }
+    public static String getKey(org.w3c.dom.Element node) throws NavuException {
+        NamedNodeMap attributes = node.getAttributes();
+        return attributes.getNamedItem("key").getTextContent().replace(" ", "&nbsp");
     }
     public void saveToNSO(Maapi maapi, int tHandle, ConfPath extensionspath) throws Exception {
         ConfPath path = new ConfPath(extensionspath.toString()+"/entry{"+this.key+"}");

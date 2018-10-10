@@ -6,6 +6,7 @@ module cisco-virl-design {
   import tailf-common { prefix tailf; }
   import tailf-ncs { prefix ncs; }
   import cisco-virl-stats { prefix cisco-virl-stats; }
+  import cisco-virl { prefix cisco-virl; }
 
   
 
@@ -13,7 +14,7 @@ module cisco-virl-design {
     tailf:info "VIRL designer with services to manage VIRL topologies";
     list topology {
       key "name";
-      uses cisco-virl-stats:live_ncs_topology-grouping;
+      uses cisco-virl:topology-grouping;
       tailf:action Start-Simulation {
         tailf:actionpoint StartSimulation-action;
         input {

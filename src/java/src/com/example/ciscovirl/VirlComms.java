@@ -2,6 +2,8 @@ package com.example.ciscovirl;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Map;
+import org.apache.log4j.Logger;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
@@ -44,6 +46,7 @@ import com.tailf.ned.NedException;
 import com.tailf.ned.NedErrorCode;
 
 public class VirlComms {
+    private static Logger LOGGER = Logger.getLogger(VirlComms.class);
     private CloseableHttpClient httpclient;
     private CredentialsProvider credsProvider;
     private String baseAPIURL;
@@ -66,6 +69,16 @@ public class VirlComms {
         this.httpclient = HttpClients.custom()
                 .setDefaultCredentialsProvider(credsProvider)
                 .build();
+    }
+    public boolean ping(com.example.ciscovirl.Node node) throws NedException {
+        String ipAddr = null;
+        try {
+            ipAddr = ((Entry) node.extensions.entrys.get("AutoNetkit.mgmt_ip")).value;
+            InetAddress adr = InetAddress.getByName(ipAddr);
+            return adr.isReachable(3000);
+        } catch (IOException e) {
+            throw new NedException(NedErrorCode.CONNECT_CONNECTION_REFUSED, "Cannont ping "+ipAddr, e);
+        }
     }
     public String execRequest(Object requestType, String requestURL, String requestPayload, boolean dryRun) throws NedException {
         try {
@@ -93,6 +106,7 @@ public class VirlComms {
                     HttpGet httpget = new HttpGet(requestString);
                     if (dryRun) return httpget.toString();
                     try {
+    LOGGER.info("REQUEST("+httpget.getURI().toString());
                         response = httpclient.execute(httpget);
                         responseStr = EntityUtils.toString(response.getEntity());
                         if (response.getStatusLine().getStatusCode() != 200) {

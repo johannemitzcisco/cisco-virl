@@ -28,7 +28,7 @@ NCSCPATH   = $(YANGPATH:%=--yangpath %)
 
 
 
-fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl-stats.fxs $(NFXS)/cisco-virl.fxs $(FXS)
+fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(NFXS)/cisco-virl-stats.fxs $(FXS) 
 # fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(FXS)
 .PHONY: fxs
 

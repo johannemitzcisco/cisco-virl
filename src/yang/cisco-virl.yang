@@ -6,15 +6,115 @@ module cisco-virl {
   import tailf-ncs-ned { prefix ned; }
   import tailf-common { prefix tailf; }
   import tailf-ncs { prefix ncs; }
-  import cisco-virl-stats { prefix cisco-virl-stats; }
 
   identity cisco-virl-id {
     base ned:generic-ned-id;
   }
 
+  grouping topology-grouping {
+    leaf name {
+      type string;
+    }
+    leaf annotation-xmlns {
+      type string;
+      default "http://www.cisco.com/VIRL";
+    }
+    leaf annotation-schemaVersion {
+      type string;
+      default "0.95";
+    }
+    leaf annotation-xsiSchemaLocation {
+      type string;
+      default "http://www.cisco.com/VIRL https://raw.github.com/CiscoVIRL/schema/v0.95/virl.xsd";
+    }
+    leaf annotation-xmlnsXSI {
+      type string;
+      default "http://www.w3.org/2001/XMLSchema-instance";
+    }
+    container extensions {
+      list entry {
+        key "key";
+        leaf key {
+          type string;
+        }
+        leaf type {
+          type string;
+        }
+        leaf value {
+          type string;
+        }
+      }
+    }
+    list node {
+      key "name";
+      leaf name {
+        type string;
+      }
+      leaf connection-index {
+        type uint32;
+      }
+      leaf type {
+        type string;
+      }
+      leaf subtype {
+        type string;
+      }
+//      leaf state {
+//        type string;
+//      }
+      leaf excludeFromLaunch {
+        type boolean;
+      }
+      leaf location {
+        type string;
+      }
+      container extensions {
+        list entry {
+          key "key";
+          leaf key {
+            type string;
+          }
+          leaf type {
+            type string;
+          }
+          leaf value {
+            type string;
+          }
+        }
+      }
+      list interface {
+        key "id";
+        leaf id {
+          type uint32;
+        }
+        leaf connection-index {
+          type uint32;
+        }
+        leaf name {
+          type string;
+        }
+        leaf ipv4 {
+          type string;
+        }
+        leaf netPrefixLenV4 {
+          type string;
+        }
+      }
+    }
+    list connection {
+      key "src dst";
+      leaf src {
+        type string;
+      }
+      leaf dst {
+        type string;
+      }
+    }
+  }
+
   list simulation {
     key "name";
-    uses cisco-virl-stats:topology-grouping;
+    uses topology-grouping;
   }
 
   container commands {

@@ -73,8 +73,6 @@ public class ciscovirl extends ConfNamespace {
     public static final String _ipv4_ = "ipv4";
     public static final int    _value = 864367181;
     public static final String _value_ = "value";
-    public static final int    _state = 630973766;
-    public static final String _state_ = "state";
     public static final int    _netPrefixLenV4 = 204259445;
     public static final String _netPrefixLenV4_ = "netPrefixLenV4";
     public static final int    _connection_index = 830553501;

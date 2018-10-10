@@ -29,9 +29,10 @@ public class Node implements StatsList {
     public String name;
     private String type;
     private String subtype;
-    private String state;
-    private String excludeFromLaunch = "false";
+    public String state;
+    public String excludeFromLaunch = "false";
     private String location = "50,50";
+    public boolean reachable = false;
     public Extensions extensions;
     @SerializedName("interface") public ArrayList<Interface> interfaces;
 
@@ -40,6 +41,7 @@ public class Node implements StatsList {
 
     public String toXML() {
         String xml = String.format(startXML, this.name, this.type, this.subtype, this.location);
+        xml = xml + extensions.toXML();
         for (Interface intf : interfaces) {
             xml = xml + intf.toXML();
         }
@@ -62,7 +64,7 @@ public class Node implements StatsList {
         this.name = nodeModel.leaf(ciscovirl._name).valueAsString();
         this.type = nodeModel.leaf(ciscovirl._type).valueAsString();
         this.subtype = nodeModel.leaf(ciscovirl._subtype).valueAsString();
-        this.state = nodeModel.leaf(ciscovirl._state).valueAsString();
+//        this.state = nodeModel.leaf(ciscovirl._state).valueAsString();
         this.excludeFromLaunch = nodeModel.leaf(ciscovirl._excludeFromLaunch).valueAsString();
         this.location = nodeModel.leaf(ciscovirl._location).valueAsString();
         this.extensions = new Extensions(nodeModel.container(ciscovirl._extensions));
@@ -79,10 +81,10 @@ public class Node implements StatsList {
     	this.type = attributes.getNamedItem("type").getTextContent();
         this.subtype = attributes.getNamedItem("subtype").getTextContent();
         if (attributes.getNamedItem("location") != null) this.location = attributes.getNamedItem("location").getTextContent();
-        if (attributes.getNamedItem("excludeFromLaunch") != null) 
-            System.out.println("Node: "+this.name+" excludeFromLaunch: "+attributes.getNamedItem("excludeFromLaunch").getTextContent());
-        else 
-            System.out.println("Node: "+this.name+" excludeFromLaunch: NOT SET");
+        // if (attributes.getNamedItem("excludeFromLaunch") != null) 
+        //     System.out.println("Node: "+this.name+" excludeFromLaunch: "+attributes.getNamedItem("excludeFromLaunch").getTextContent());
+        // else 
+        //     System.out.println("Node: "+this.name+" excludeFromLaunch: NOT SET");
         if (attributes.getNamedItem("excludeFromLaunch") != null) this.excludeFromLaunch = attributes.getNamedItem("excludeFromLaunch").getTextContent();
     	Element extensionNode = (Element) topoDeviceNode.getElementsByTagName("extensions").item(0);
         this.extensions = new Extensions(extensionNode);
@@ -103,21 +105,26 @@ public class Node implements StatsList {
     }
     public void saveToNSO(Maapi maapi, int tHandle, ConfPath topologypath) throws Exception {
         if (this.name == null) throw new Exception("Unable to Save Node with NULL Name");
-        if (!this.isStatsListPath(topologypath)) topologypath = new ConfPath(topologypath.toString()+"/node");
-        ConfPath nodePath = new ConfPath(topologypath.toString()+"{"+this.name+"}");
+        ConfPath path = new ConfPath(topologypath.toString());
+        if (!this.isStatsListPath(topologypath)) path = new ConfPath(topologypath.toString()+"/node");
+        ConfPath nodePath = new ConfPath(path.toString()+"{"+this.name+"}");
         if (!maapi.exists(tHandle, nodePath)) maapi.create(tHandle, nodePath);
-        if (this.connectionIndex != null) maapi.setElem(tHandle, this.connectionIndex.toString(), new ConfPath(nodePath.toString()+"/connection-index"));
-        if (this.type != null) maapi.setElem(tHandle, this.type, new ConfPath(nodePath.toString()+"/type"));
-        if (this.subtype != null) maapi.setElem(tHandle, this.subtype, new ConfPath(nodePath.toString()+"/subtype"));
-        if (this.location != null) maapi.setElem(tHandle, this.location, new ConfPath(nodePath.toString()+"/location"));
-        if (this.excludeFromLaunch != null) maapi.setElem(tHandle, this.excludeFromLaunch, new ConfPath(nodePath.toString()+"/excludeFromLaunch"));
-        if (this.state != null) maapi.setElem(tHandle, this.state, new ConfPath(nodePath.toString()+"/state"));
-        if (this.extensions != null) 
-        	this.extensions.saveToNSO(maapi, tHandle, nodePath);
-        if (this.interfaces != null) {
-	        for (Interface i: this.interfaces) {
-    	        i.saveToNSO(maapi, tHandle, nodePath);
-        	}
+        maapi.setElem(tHandle, this.excludeFromLaunch, new ConfPath(nodePath.toString()+"/excludeFromLaunch"));
+        if (this.isStatsListPath(topologypath)) {
+            maapi.setElem(tHandle, new Boolean(this.reachable).toString(), new ConfPath(nodePath.toString()+"/reachable"));
+            if (this.state != null) maapi.setElem(tHandle, this.state, new ConfPath(nodePath.toString()+"/state"));
+        } else {
+            if (this.connectionIndex != null) maapi.setElem(tHandle, this.connectionIndex.toString(), new ConfPath(nodePath.toString()+"/connection-index"));
+            if (this.type != null) maapi.setElem(tHandle, this.type, new ConfPath(nodePath.toString()+"/type"));
+            if (this.subtype != null) maapi.setElem(tHandle, this.subtype, new ConfPath(nodePath.toString()+"/subtype"));
+            if (this.location != null) maapi.setElem(tHandle, this.location, new ConfPath(nodePath.toString()+"/location"));
+            if (this.extensions != null) 
+            	this.extensions.saveToNSO(maapi, tHandle, nodePath);
+            if (this.interfaces != null) {
+    	        for (Interface i: this.interfaces) {
+        	        i.saveToNSO(maapi, tHandle, nodePath);
+            	}
+            }
         }
     }
     public static Node getInstanceOf(Map.Entry<String, JsonElement> entry) throws Exception {
@@ -127,7 +134,8 @@ public class Node implements StatsList {
         return node;
     }
     public static Node getInstanceOf(Map.Entry<String, JsonElement> entry, VirlComms comms) throws Exception {
-        return Node.getInstanceOf(entry);
+        Node node = Node.getInstanceOf(entry);
+        return node;
     }
     public static String getName(ConfPath path) {
         Pattern pattern = Pattern.compile("\\{(.*?)\\}");

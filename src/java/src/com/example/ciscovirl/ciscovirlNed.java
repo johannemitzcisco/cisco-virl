@@ -743,67 +743,6 @@ public class ciscovirlNed extends NedGenericBase  {
     private String keyValue(ConfKey key) {
         return key.toString().replace("{","").replace("}","");
     }
-
-    private SimState buildSimulation (ArrayDeque<ConfObject> keyqueue) {
-        ConfKey key = null;
-        ConfTag tag = null;
-        if (keyqueue.peek() instanceof ConfTag) {
-            tag = (ConfTag)keyqueue.pop();
-        } else {
-            key = (ConfKey)keyqueue.pop();
-            tag = (ConfTag)keyqueue.pop();
-        }
-        SimState sim = null;
-        if (! keyqueue.isEmpty()) sim = buildSimulation(keyqueue.clone());
-        LOGGER.info("BUILD tag: "+tag+" key: "+key);
-        switch (tag.getTagHash()) {
-        case ciscovirl._simulation:
-            sim = this.simStates.get(keyValue(key));
-            if (sim == null) {
-                LOGGER.info("Create Simulation: ");
-                sim = new SimState(keyValue(key));
-                this.simStates.put(keyValue(key), sim);
-            }
-            break;
-        case ciscovirl._extensions:
-            LOGGER.info("Create Extensions: ");
-            ConfKey parentkey = (ConfKey)keyqueue.pop();
-            ConfTag parenttag = (ConfTag)keyqueue.pop();
-            if (parenttag.getTagHash() == ciscovirl._simulation) {
-                // This is a simulation extension
-                if (sim.extensions == null) sim.extensions = new Extensions();
-            } else {
-                // This is a node extension
-                ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
-                com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(parentkey)));
-                if (node.extensions == null) node.extensions = new Extensions();
-            }
-            break;
-        case ciscovirl._entry:
-            LOGGER.info("Create Entry: ");
-            ConfTag eparenttag = (ConfTag)keyqueue.pop(); // pop extensions off
-            ConfKey eparentkey = (ConfKey)keyqueue.pop(); // get grandparent
-            eparenttag = (ConfTag)keyqueue.pop();
-            if (eparenttag.getTagHash() == ciscovirl._simulation) {
-                // This is a simulation extension entry
-                sim.extensions.entrys.add(new Entry(keyValue(key)));
-            } else {
-                // This is a node extension
-                ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
-                com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(eparentkey)));
-                node.extensions.entrys.add(new Entry(keyValue(key)));
-            }
-            break;
-        case ciscovirl._node:
-            LOGGER.info("Create Node: " + keyValue(key));
-            LOGGER.info("Create Node: " + sim.nodes.size());
-            sim.nodes.add(new com.example.ciscovirl.Node(keyValue(key), new Integer(sim.nodes.size())));
-            break;
-        case ciscovirl._connection:
-            break;
-        }
-        return sim;
-    }
     public void create(NavuContainer root, NedEditOp op, StringBuilder dryRun) throws NedException {
         ArrayList<ConfObject> keypath = getkeypath(op);
         ConfKey key = (ConfKey)keypath.get(0);
@@ -834,20 +773,20 @@ public class ciscovirlNed extends NedGenericBase  {
         ArrayList<ConfObject> keypath = getkeypath(op);
         ConfKey key = (ConfKey)keypath.get(1);
         ConfTag tag = (ConfTag)keypath.get(0);
-        ConfTag nodeStateTag = new ConfTag("cisco-virl", "state");
+        ConfTag nodeStateTag = new ConfTag("cisco-virl", "excludeFromLaunch");
         String simName = getSimName(keypath);
         SimState simstate = simStates.get(simName);
         if (simstate.action.equals("START") || simstate.action.equals("RESTART")) {
             // We have already loaded all the details
             return;
         }
-
+LOGGER.info("VALUESET: tag: "+tag.toString()+" key: "+key.toString());
         if (!tag.equals(nodeStateTag)) {
             LOGGER.info("Setting Simulation to Restart");
             simstate.setRestart();
         } else {
             LOGGER.info("NODE STATE VALUE: "+op.getValue());
-            if (op.getValue().toString().equals("ABSENT")) {
+            if (op.getValue().toString().equals("true")) {
                 NodeState nodestate = new NodeState(key.elementAt(0).toString(), "STOP");
                 if (!simstate.actionNodes.containsKey(nodestate.name)) {
                     LOGGER.info("Setting Node to Stop");
@@ -893,5 +832,66 @@ public class ciscovirlNed extends NedGenericBase  {
     public void getTransId(NedWorker w) throws NedException, IOException {
         w.error(NedCmd.GET_TRANS_ID, "getTransId", "not supported");
     }
+
+    // private SimState buildSimulation (ArrayDeque<ConfObject> keyqueue) {
+    //     ConfKey key = null;
+    //     ConfTag tag = null;
+    //     if (keyqueue.peek() instanceof ConfTag) {
+    //         tag = (ConfTag)keyqueue.pop();
+    //     } else {
+    //         key = (ConfKey)keyqueue.pop();
+    //         tag = (ConfTag)keyqueue.pop();
+    //     }
+    //     SimState sim = null;
+    //     if (! keyqueue.isEmpty()) sim = buildSimulation(keyqueue.clone());
+    //     LOGGER.info("BUILD tag: "+tag+" key: "+key);
+    //     switch (tag.getTagHash()) {
+    //     case ciscovirl._simulation:
+    //         sim = this.simStates.get(keyValue(key));
+    //         if (sim == null) {
+    //             LOGGER.info("Create Simulation: ");
+    //             sim = new SimState(keyValue(key));
+    //             this.simStates.put(keyValue(key), sim);
+    //         }
+    //         break;
+    //     case ciscovirl._extensions:
+    //         LOGGER.info("Create Extensions: ");
+    //         ConfKey parentkey = (ConfKey)keyqueue.pop();
+    //         ConfTag parenttag = (ConfTag)keyqueue.pop();
+    //         if (parenttag.getTagHash() == ciscovirl._simulation) {
+    //             // This is a simulation extension
+    //             if (sim.extensions == null) sim.extensions = new Extensions();
+    //         } else {
+    //             // This is a node extension
+    //             ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
+    //             com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(parentkey)));
+    //             if (node.extensions == null) node.extensions = new Extensions();
+    //         }
+    //         break;
+    //     case ciscovirl._entry:
+    //         LOGGER.info("Create Entry: ");
+    //         ConfTag eparenttag = (ConfTag)keyqueue.pop(); // pop extensions off
+    //         ConfKey eparentkey = (ConfKey)keyqueue.pop(); // get grandparent
+    //         eparenttag = (ConfTag)keyqueue.pop();
+    //         if (eparenttag.getTagHash() == ciscovirl._simulation) {
+    //             // This is a simulation extension entry
+    //             sim.extensions.entrys.add(new Entry(keyValue(key)));
+    //         } else {
+    //             // This is a node extension
+    //             ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
+    //             com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(eparentkey)));
+    //             node.extensions.entrys.add(new Entry(keyValue(key)));
+    //         }
+    //         break;
+    //     case ciscovirl._node:
+    //         LOGGER.info("Create Node: " + keyValue(key));
+    //         LOGGER.info("Create Node: " + sim.nodes.size());
+    //         sim.nodes.add(new com.example.ciscovirl.Node(keyValue(key), new Integer(sim.nodes.size())));
+    //         break;
+    //     case ciscovirl._connection:
+    //         break;
+    //     }
+    //     return sim;
+    // }
 
 }

@@ -15,29 +15,36 @@ import org.w3c.dom.Document;
 public class StatsListFactory {
 	public static ArrayList<StatsList> getStatsList(VirlComms comms, ConfPath path) throws Exception {
 		ArrayList<StatsList> list = new ArrayList<StatsList>();
-		if (Interface.isStatsListPath(path)) {
-			Simulation simulation = Simulation.getSimulationExport(new Simulation(), Simulation.getName(path), comms);
-			String nodeName = Node.getName(path);
-			for (Node node: simulation.topology.nodes) {
-				if (node.getName().equals(nodeName)) {
-					for (Interface interf : node.interfaces) {
-						list.add(interf);
-					}
-				}
-				break;
-			}
-		}
-		else if (Connection.isStatsListPath(path)) {
-			Simulation simulation = Simulation.getSimulationExport(new Simulation(), Simulation.getName(path), comms);
-			for (Connection connection: simulation.topology.connections) {
-				list.add(connection);
-			}
-		}
-		else if (Node.isStatsListPath(path)) {
+		// if (Interface.isStatsListPath(path)) {
+		// 	Simulation simulation = Simulation.getSimulationExport(new Simulation(), Simulation.getName(path), comms);
+		// 	String nodeName = Node.getName(path);
+		// 	for (Node node: simulation.topology.nodes) {
+		// 		if (node.getName().equals(nodeName)) {
+		// 			for (Interface interf : node.interfaces) {
+		// 				list.add(interf);
+		// 			}
+		// 		}
+		// 		break;
+		// 	}
+		// }
+		// else if (Connection.isStatsListPath(path)) {
+		// 	Simulation simulation = Simulation.getSimulationExport(new Simulation(), Simulation.getName(path), comms);
+		// 	for (Connection connection: simulation.topology.connections) {
+		// 		list.add(connection);
+		// 	}
+		// }
+		if (Node.isStatsListPath(path)) {
 			JsonObject data = comms.requestJSONData(Node.getStatsListURL(path), Node.getStatsListJsonPath(path));
 			for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
 				Node node = Node.getInstanceOf(entry, comms);
-				list.add(node);
+		        Simulation simulation = Simulation.getSimulationExport(new Simulation(), Simulation.getName(path), comms);
+	            for (Node n : simulation.topology.nodes) {
+	            	if (n.name.equals(node.name)) {
+	            		if (node.state.equals("ACTIVE")) node.reachable = comms.ping(n);
+	            		node.excludeFromLaunch = n.excludeFromLaunch;
+						list.add(node);
+	            	}
+	            }
 			}
 		}
 		else if (Simulation.isStatsListPath(path)) {
@@ -51,7 +58,7 @@ public class StatsListFactory {
 	}
 	public static void saveToNSO(List<StatsList> list, Maapi maappi, int tHandle, ConfPath basePath) throws Exception {
 		for (StatsList item: list) {
-System.out.println("saveToNSO Basepath: "+basePath+"==================================================================");
+System.out.println("saveToNSO Basepath: "+basePath+"       ====================================");
 			item.saveToNSO(maappi, tHandle, basePath);
 		}
 	}
