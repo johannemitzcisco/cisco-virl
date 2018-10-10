@@ -3,9 +3,13 @@ package com.example.ciscovirl;
 import com.example.ciscovirl.namespaces.*;
 import java.io.IOException;
 import java.net.InetAddress;
-//import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import org.apache.log4j.Logger;
+import com.tailf.conf.Conf;
 import com.tailf.conf.ConfInt32;
 import com.tailf.conf.ConfInt8;
 import com.tailf.conf.ConfKey;
@@ -22,6 +26,7 @@ import com.tailf.conf.ConfXMLParamStop;
 import com.tailf.maapi.Maapi;
 import com.tailf.maapi.MaapiException;
 import com.tailf.maapi.MaapiSchemas;
+import com.tailf.maapi.MaapiUserSessionFlag;
 import com.tailf.ncs.ResourceManager;
 import com.tailf.ncs.annotations.Scope;
 import com.tailf.ncs.ns.Ncs;
@@ -35,6 +40,12 @@ import com.tailf.ned.NedMux;
 import com.tailf.ned.NedTTL;
 import com.tailf.ned.NedWorker;
 import com.tailf.ned.NedWorker.TransactionIdMode;
+import com.tailf.navu.NavuContext;
+import com.tailf.navu.NavuContainer;
+import com.tailf.navu.NavuNode;
+import com.tailf.navu.NavuList;
+import com.tailf.navu.NavuListEntry;
+import com.tailf.navu.NavuException;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -66,9 +77,58 @@ public class ciscovirlNed extends NedGenericBase  {
 
     private static MaapiSchemas schemas;
     private static MaapiSchemas.CSNode cfgCs;
-    private static MaapiSchemas.CSNode rpcCs;
 
     private VirlComms comms;
+    private HashMap<String, SimState> simStates;
+
+    private class NodeState {
+        public String name;
+        public NodeState(String name, String action) {
+            this.name = name;
+            this.action = action;
+        }
+        public String action;
+        public void setStart() {
+            if (action == null) {
+                this.action = "START";
+            }
+        }
+        public void setStop() {
+            if (action == null) {
+                this.action = "STOP";
+            }
+        }
+    }
+    private class SimState extends Topology {
+        HashMap<String, NodeState> actionNodes = new HashMap<>();
+        public SimState(NavuContainer simModel) throws NavuException {
+            super(simModel);
+            this.action = "NONE";
+        }
+        public SimState(String simName) {
+            super(simName);
+            this.action = "NONE";
+        }
+        public String action;
+        public void setStart() {
+            if (this.action == "NONE") {
+                this.action = "START";
+            }
+        }
+        public void setStop() {
+            if (this.action == "NONE") {
+                this.action = "STOP";
+            }
+        }
+        public void setRestart() {
+            if (this.action == "NONE" || this.action == "START") {
+                this.action = "RESTART";
+            }
+        }
+        public boolean equals(SimState simState) {
+            return this.name.equals(simState.name);
+        }
+    }
 
     public ciscovirlNed(){
         this(true);
@@ -101,10 +161,7 @@ public class ciscovirlNed extends NedGenericBase  {
             this.writeTimeout = writeTimeout;
             this.wantReverse = wantReverse;
 
-//            this.device = ciscovirlNed.init(deviceName);
             this.comms = new VirlComms(this, ip, port, worker.getRemoteUser(), worker.getPassword());
-
-
             LOGGER.info("CONNECTING <==");
 
             NedCapability capas[] = new NedCapability[1];
@@ -114,11 +171,14 @@ public class ciscovirlNed extends NedGenericBase  {
             statscapas[0] = new NedCapability("http://com/example/ciscovirl-stats",
                                               "cisco-virl-stats");
 
+            this.schemas = Maapi.getSchemas();
+            this.cfgCs =
+                this.schemas.findCSNode(Ncs.uri,"/devices/device/config");
+
             setConnectionData(capas,
                               statscapas,
                               this.wantReverse,  // want reverse-diff
                               TransactionIdMode.NONE);
-
 
             LOGGER.info("CONNECTING ==> OK");
         }
@@ -126,307 +186,6 @@ public class ciscovirlNed extends NedGenericBase  {
             worker.error(NedCmd.CONNECT_GENERIC, e.getMessage()," Cntc error");
         }
     }
-
-    private void connect() {
-        LOGGER.info("CONNECT <==");
-//        comms.connect();
-        LOGGER.info("CONNECT ==> OK");
-    }
-
-    public boolean isAlive() {
-        LOGGER.info("IS ALIVE <==");
-        LOGGER.info("IS ALIVE ==> OK");
-        return true;
-    }
-
-    public void reconnect(NedWorker worker) {
-        LOGGER.info("RECONNECT <==");
-//        comms.connect();
-        LOGGER.info("RECONNECT ==> OK");
-    }
-
-    public String device_id() {
-        LOGGER.info("DEVICE-ID <==");
-        LOGGER.info("DEVICE-ID ==> OK");
-        return deviceName;
-    }
-
-    // should return "cli" or "generic"
-    public String type() {
-        return "generic";
-    }
-    // Which YANG modules are covered by the class
-    public String [] modules() {
-        LOGGER.info("modules");
-        return new String[] { "cisco-virl", "cisco-virl-stats" };
-    }
-
-    // Which identity is implemented by the class
-    public String identity() {
-        return "cisco-virl:cisco-virl-id";
-    }
-
-    /*
-     * This method must at-least populate the path it is given,
-     * it may do more though
-     */
-
-    public void showStats(NedWorker worker, int tHandle, ConfPath path)
-        throws NedException, IOException {
-        try {
-            LOGGER.info("SHOW STATS <==");
-            if (maapi == null)
-                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
-            LOGGER.info( this.toString()  + " Attaching to Maapi " + maapi +
-                         " for " + path);
-//            LOGGER.info( "Node Path: "+ Node.isPath(path));
-//            LOGGER.info( "Simulation Path: "+ Simulation.isPath(path));
-
-            // maapi.attach(tHandle, 0);
-            // if (Node.isPath(path)) {
-            //     JsonObject simNodeData = requestJSONData(Node.getURLSuffix(path), Node.getJsonRoot(path));
-            //     maapi.setElem(tHandle, Node.getConfValueFromPath(simNodeData, path), path);
-            // } else if (Simulation.isPath(path)) {
-            //     JsonObject simData = requestJSONData(Simulation.getURLSuffix(path), Simulation.getJsonRoot(path));
-            //     maapi.setElem(tHandle, Simulation.getConfValueFromPath(simData, path), path);
-            // }
-            // maapi.detach(tHandle);
-            worker.showStatsResponse(null);
-            LOGGER.info("SHOW STATS ===> OK");
-        }
-        catch (Exception e) {
-            worker.error(NedEditOp.VALUE_SET, "Unable to get Running Simulation Detail");
-            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
-        }
-    }
-
-
-    /*
-     *   This method must at-least fill in all the keys of the list it
-     *   is passed, it may do more though. In this example  code we
-     *   choose to not let the code in showStatsList() fill in the full
-     *   entries, thus forcing an invocation of showStats()
-     */
-    public void showStatsList(NedWorker worker, int tHandle, ConfPath path)
-        throws NedException, IOException {
-        try {
-            LOGGER.info("SHOW STATS LIST <==");
-            if (maapi == null)
-                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
-
-            LOGGER.info( this.toString()  + " Attaching2 to Maapi " + maapi +
-                         " for " + path.toString());
-            maapi.attach(tHandle, 0);
-//            NedTTL[] nedTTLs;
-            try {
-                List<StatsList> statlist = StatsListFactory.getStatsList(comms, path);
-                StatsListFactory.saveToNSO(statlist, maapi, tHandle, path);
-
-//                 JsonObject data = null;
-// /*                if (Entry.isPath(path)) {
-//                     LOGGER.info( "Extensions/Entry Path");
-//                     data = requestXMLData(Entry.getURLSuffix(path), Entry.getJsonRoot(path));
-//                 } else if (Node.isPath(path)) {
-//                     LOGGER.info( "Node Path");
-//                     data = requestJSONData(Node.getURLSuffix(path), Node.getJsonRoot(path));
-//                 } else*/ if (Simulation.isStatsListPath(path)) {
-//                     data = requestJSONData(Simulation.getURLSuffix(path), Simulation.getJsonRoot(path));
-//                     Simulation.StatsListToNSO(data);
-//                 }
-// /*                if (data != null) {
-//                     for (Map.Entry<String, JsonElement> nodeEntry : data.entrySet()) {
-//                         ConfPath newPath = new ConfPath(path.toString()+"{"+nodeEntry.getKey()+"}");
-//                         if (!maapi.exists(tHandle, newPath)) maapi.create(tHandle, newPath);
-//                     }
-//                 }
-                LOGGER.info("SHOW STATS LIST ===> OK");
-            } catch (Exception e) {
-                worker.error(NedEditOp.VALUE_SET, "Unable to get stats list data");
-                throw e;
-            }
-            maapi.detach(tHandle);
-            worker.showStatsListResponse(10, null);
-//            worker.showStatsListResponse(30, nedTTLs);
-        }
-        catch (Exception e) {
-            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
-        }
-    }
-
-    /**
-     * Is invoked by NCS to take the configuration to a new state.
-     * We retrive a rev which is a transaction handle to the
-     * comming write operation then we write operations towards the device.
-     * If all succeded we transition to commit phase or if
-     * prepare fails we transition to abort phase.
-     *
-     * @param w - is the processing worker. It should be used for sending
-     * responses to NCS.
-     * @param data is the commands for transforming the configuration to
-     * a new state.
-     */
-
-    public void prepare(NedWorker worker, NedEditOp[] ops)
-        throws NedException, IOException {
-        LOGGER.info("PREPARE <==");
-
-        for (int i = 0; i<ops.length; i++) {
-            LOGGER.info("op " + ops[i]);
-        }
-        //edit(ops);
-        worker.prepareResponse();
-    }
-
-    /**
-     * Is invoked by NCS to ask the NED what actions it would take towards
-     * the device if it would do a prepare.
-     *
-     * The NED can send the preformatted output back to NCS through the
-     * call to  {@link com.tailf.ned.NedWorker#prepareDryResponse(String)
-     * prepareDryResponse()}
-     *
-     * The Ned should invoke the method
-     * {@link com.tailf.ned.NedWorker#prepareDryResponse(String)
-     *   prepareDryResponse()} in <code>NedWorker w</code>
-     * when the operation is completed.
-     *
-     * If the functionality is not supported or an error is detected
-     * answer this through a call to
-     * {@link com.tailf.ned.NedWorker#error(int,String,String) error()}
-     * in <code>NedWorker w</code>.
-     *
-     * @param w
-     *    The NedWorker instance currently responsible for driving the
-     *    communication
-     *    between NCS and the device. This NedWorker instance should be
-     *    used when communicating with the NCS, ie for sending responses,
-     *    errors, and trace messages. It is also implements the
-     *    {@link NedTracer}
-     *    API and can be used in, for example, the {@link SSHSession}
-     *    as a tracer.
-     *
-     * @param ops
-     *    Edit operations representing the changes to the configuration.
-     */
-    public void prepareDry(NedWorker worker, NedEditOp[] ops)
-        throws NedException {
-        StringBuilder dryRun = new StringBuilder();
-
-        LOGGER.info("PREPARE DRY <==");
-//        edit(ops, dryRun);
-        try {
-            worker.prepareDryResponse(dryRun.toString());
-        }
-        catch (IOException e) {
-            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR,
-                                   "Internal error when calling "+
-                                   "prepareDryResponse: "+
-                                   e.getMessage());
-        }
-        LOGGER.info("PREPARE DRY ==> OK");
-    }
-
-    public void commit(NedWorker worker, int timeout)
-        throws NedException, IOException {
-        LOGGER.info("COMMIT <==");
-        worker.commitResponse();
-    }
-
-    /**
-     * Is invoked by NCS to abort the configuration to a previous state.
-     *
-     * @param w is the processing worker. It should be used for sending
-     * responses to NCS. * @param data is the commands for taking the config
-     * back to the previous
-     * state. */
-
-    public void abort(NedWorker worker , NedEditOp[] ops)
-        throws NedException, IOException {
-        LOGGER.info("ABORT <==");
-        //edit(ops);
-        worker.abortResponse();
-        LOGGER.info("ABORT ==> OK");
-    }
-
-
-    public void revert(NedWorker worker , NedEditOp[] ops)
-        throws NedException, IOException {
-        LOGGER.info("REVERT <==");
-        //edit(ops);
-        worker.revertResponse();
-        LOGGER.info("REVERT ==> OK");
-    }
-
-
-    public void persist(NedWorker worker)
-        throws NedException, IOException {
-        LOGGER.info("PERSIST <==");
-        worker.persistResponse();
-
-    }
-
-    public void close(NedWorker worker)
-        throws NedException, IOException {
-        close();
-    }
-
-    public void close() {
-        LOGGER.info("CLOSE <==");
-        try {
-            if (maapi != null)
-                ResourceManager.unregisterResources(this);
-        }
-        catch (Exception e) {
-            ;
-        }
-        LOGGER.info("CLOSE ==> OK");
-    }
-
-    /*
-     * The generic show command is to
-     * grab all configuration from the device and
-     * populate the transaction handle  passed to us.
-     **/
-
-    public void show(NedWorker worker, int tHandle)
-        throws NedException, IOException {
-        try {
-            LOGGER.info("SHOW <==");
-            LOGGER.info("THANDLE:" + tHandle);
-            if (maapi == null)
-                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
-            LOGGER.info( this.toString()  + " Attaching to Maapi " + maapi);
-//             maapi.attach(tHandle, 0);
-//             String devPath =
-//                 "/ncs:devices/device{" + deviceName + "}/config/";
-//             Gson gson = new Gson();
-//             JsonObject data = requestJSONData(Simulation.getURLSuffix(null), Simulation.getJsonRoot(null));
-//             if (data != null) {
-//                 for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
-//                     if (entry.getKey().equals("~jumphost")) continue; //Gson parser barfs on something in this guys json
-//                     Simulation simulation = new Simulation(entry.getKey(), this.deviceName);
-//                     String simXML = execRequest(RequestType.GET, "/export/"+entry.getKey());
-//                     String simJson = XML.toJSONObject(simXML).toString();
-//                     LOGGER.info(XML.toJSONObject(simXML).toString(4));
-
-//                     JsonObject root = new JsonParser().parse(simJson).getAsJsonObject();
-// //                    LOGGER.info("TOPO JSON:\n"+root.toString());
-//                     Topology topology = gson.fromJson(root.getAsJsonObject().get("topology").getAsJsonObject(), Topology.class);
-//                     simulation.setTopology(topology);
-//                     LOGGER.info("\n"+simulation.toString());
-//                     simulation.toNSO(this, tHandle);
-//                 }
-//             }
-//             maapi.detach(tHandle);
-            worker.showGenericResponse();
-            LOGGER.info("SHOW ==> OK");
-        }
-        catch (Exception e) {
-            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
-        }
-    }
-
-
 
     public boolean isConnection(String deviceId,
                                 InetAddress ip,
@@ -538,300 +297,601 @@ public class ciscovirlNed extends NedGenericBase  {
         return ned;
     }
 
-    public void getTransId(NedWorker w) throws NedException, IOException {
-        w.error(NedCmd.GET_TRANS_ID, "getTransId", "not supported");
+    private void connect() {
+        LOGGER.info("CONNECT <==");
+        LOGGER.info("CONNECT ==> OK");
     }
 
-
-// Now below here we have specific code to fake the data that is kept on the
-// devices. In reality, this data is on the device and it's the
-// NEDs job to read and write that data
-
-// Here we fake this, in order to have this skeleton code
-// a bit more realistic
-// The data we keep here is the equvalent of what is modelled
-// in cisco-virl.yang
-
-
-/*    public static Device init(String name) throws MaapiException, NedException {
-        if (devices == null) {
-            ciscovirlNed.schemas = Maapi.getSchemas();
-            ciscovirlNed.cfgCs =
-                ciscovirlNed.schemas.findCSNode(Ncs.uri,"/devices/device/config");
-            ciscovirlNed.rpcCs =
-                ciscovirlNed.schemas.findCSNode(Ncs.uri,
-                                        "/devices/device/rpc/rpc-my-cmd");
-
-            devices = new ArrayList<Device>();
-        }
-
-        Device device = getDevice(name);
-        if (device == null) {
-            device = new Device(name);
-            devices.add(device);
-        }
-
-        return device;
+    public boolean isAlive() {
+        LOGGER.info("IS ALIVE <==");
+        LOGGER.info("IS ALIVE ==> OK");
+        return true;
     }
 
-    public static ArrayList<Device> devices = null;
-
-    public static class Device {
-        final static int default_y = 12;
-        final static int default_z = 13;
-
-        private String name;
-        private ArrayList<Row> rows;
-
-        Device(String aName) {
-            rows =  new ArrayList<Row>();
-            this.name = aName;
-            devices.add(this);
-
-            // Start with some fake data
-            rows.add(new Row(17));
-            rows.add(new Row(42));
-            rows.add(new Row(4711));
-        }
-
-        public Row getRow(ConfKey k) {
-            int i = ((ConfInt32)k.elementAt(0)).intValue();
-            for (Row r: rows) {
-                if (r.k == i) {
-                    return r;
-                }
-            }
-
-            Row r = new Row(i);
-            rows.add(r);
-
-            return r;
-        }
+    public void reconnect(NedWorker worker) {
+        LOGGER.info("RECONNECT <==");
+        LOGGER.info("RECONNECT ==> OK");
     }
 
-    public static Device getDevice(String dev) throws NedException {
-        for (Device d: devices) {
-            if (d.name.equals(dev)) {
-                return d;
-            }
-        }
-        return null;
+    public String device_id() {
+        LOGGER.info("DEVICE-ID <==");
+        LOGGER.info("DEVICE-ID ==> OK");
+        return deviceName;
     }
 
-    public enum Direction {
-        Up, Down, NotUsed
+    // should return "cli" or "generic"
+    public String type() {
+        return "generic";
+    }
+    // Which YANG modules are covered by the class
+    public String [] modules() {
+        LOGGER.info("modules");
+        return new String[] { "cisco-virl", "cisco-virl-stats" };
     }
 
-    public static class Row {
-        int k;
-        int x;            // optional uint32
-        boolean xIsset;   // to cater for non-set x
-        int y;            // int8, default 12
-        int z;            // int8 default 13
-        Direction e;      // optional YANG enumeration
-
-        Row(int k) {
-            this.k = k;
-            xIsset = false;
-            this.e = Direction.NotUsed;
-
-            this.y = Device.default_y;
-            this.z = Device.default_z;
-        }
+    // Which identity is implemented by the class
+    public String identity() {
+        return "cisco-virl:cisco-virl-id";
     }
 
-    public void edit(NedEditOp[] ops)
-        throws NedException {
-        edit(ops, null);
-    }
+    /*
+     * The generic show command is to
+     * grab all configuration from the device and
+     * populate the transaction handle  passed to us.
+     **/
 
-    public void edit(NedEditOp[] ops, StringBuilder dryRun)
-        throws NedException {
-
+    public void show(NedWorker worker, int tHandle)
+        throws NedException, IOException {
         try {
-            for (NedEditOp op: ops) {
-                switch (op.getOperation()) {
-                case NedEditOp.CREATED:
-                    create(op, dryRun);
-                    break;
-                case NedEditOp.DELETED:
-                    delete(op, dryRun);
-                    break;
-                case NedEditOp.MOVED:
-                    break;
-                case NedEditOp.VALUE_SET:
-                    valueSet(op, dryRun);
-                    break;
-                case NedEditOp.DEFAULT_SET:
-                    defaultSet(op, dryRun);
-                    break;
+            LOGGER.info("SHOW <==");
+            LOGGER.info("THANDLE:" + tHandle);
+            if (maapi == null)
+                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
+            LOGGER.info( this.toString()  + " Attaching to Maapi " + maapi);
+            maapi.attach(tHandle, 0);
+            JsonObject data = comms.requestJSONData(Simulation.getStatsListURL(null), Simulation.getStatsListJsonPath(null));
+            for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
+                Simulation simulation = Simulation.getInstanceOf(entry, comms);
+                LOGGER.info("ADDING SIM: "+simulation.name);
+                Topology topology = simulation.topology;
+                topology.saveToNSO(maapi, tHandle, this.deviceName);
+                // To get Node Status information
+                ConfPath simPath = new ConfPath("/ncs:devices/device{"+deviceName+"}/live-status/cisco-virlstats:simulations/simulation{"+simulation.name+"}");
+                JsonObject nodedata = comms.requestJSONData(Node.getStatsListURL(simPath), Node.getStatsListJsonPath(simPath));
+                for (Map.Entry<String, JsonElement> nodeentry : nodedata.entrySet()) {
+                    Node.getInstanceOf(nodeentry).saveToNSO(maapi, tHandle, topology.configPath);
                 }
             }
-        } catch (Exception e) {
+            maapi.detach(tHandle);
+            worker.showGenericResponse();
+            LOGGER.info("SHOW ==> OK");
+        }
+        catch (Exception e) {
             throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
         }
     }
 
-    private ConfObject[] getKP(NedEditOp op) throws NedException {
-        ConfPath cp = op.getPath();
-        ConfObject[] kp;
+    /*
+     *   This method must at-least fill in all the keys of the list it
+     *   is passed, it may do more though. In this example  code we
+     *   choose to not let the code in showStatsList() fill in the full
+     *   entries, thus forcing an invocation of showStats()
+     */
+    public void showStatsList(NedWorker worker, int tHandle, ConfPath path)
+        throws NedException, IOException {
+        try {
+            LOGGER.info("SHOW STATS LIST <==");
+            if (maapi == null)
+                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
+
+            LOGGER.info( this.toString()  + " Attaching2 to Maapi " + maapi +
+                         " for " + path.toString());
+            maapi.attach(tHandle, 0);
+            try {
+                List<StatsList> statlist = StatsListFactory.getStatsList(comms, path);
+                StatsListFactory.saveToNSO(statlist, maapi, tHandle, path);
+                LOGGER.info("SHOW STATS LIST ===> OK");
+            } catch (Exception e) {
+                worker.error(NedEditOp.VALUE_SET, "Unable to get stats list data");
+                throw e;
+            }
+            maapi.detach(tHandle);
+            worker.showStatsListResponse(10, null);
+        }
+        catch (Exception e) {
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
+        }
+    }
+
+    /*
+     * This method must at-least populate the path it is given,
+     * it may do more though
+     */
+
+    public void showStats(NedWorker worker, int tHandle, ConfPath path)
+        throws NedException, IOException {
+        try {
+            LOGGER.info("SHOW STATS <==");
+            if (maapi == null)
+                maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
+            LOGGER.info( this.toString()  + " Attaching to Maapi " + maapi +
+                         " for " + path);
+            worker.showStatsResponse(null);
+            LOGGER.info("SHOW STATS ===> OK");
+        }
+        catch (Exception e) {
+            worker.error(NedEditOp.VALUE_SET, "Unable to get Running Simulation Detail");
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, "", e);
+        }
+    }
+
+    /**
+     * Is invoked by NCS to take the configuration to a new state.
+     * We retrive a rev which is a transaction handle to the
+     * comming write operation then we write operations towards the device.
+     * If all succeded we transition to commit phase or if
+     * prepare fails we transition to abort phase.
+     *
+     * @param w - is the processing worker. It should be used for sending
+     * responses to NCS.
+     * @param data is the commands for transforming the configuration to
+     * a new state.
+     */
+
+    public void prepare(NedWorker worker, NedEditOp[] ops)
+        throws NedException, IOException {
+        LOGGER.info("PREPARE <==");
 
         try {
-            kp = cp.getKP();
+            edit(worker, ops);
+            worker.prepareResponse();
+        }
+        catch (Exception e) {
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR,
+                                   "Internal error when calling "+
+                                   "prepareDryResponse: "+
+                                   e.getMessage(),e);
+        }
+    }
+
+    /**
+     * Is invoked by NCS to ask the NED what actions it would take towards
+     * the device if it would do a prepare.
+     *
+     * The NED can send the preformatted output back to NCS through the
+     * call to  {@link com.tailf.ned.NedWorker#prepareDryResponse(String)
+     * prepareDryResponse()}
+     *
+     * The Ned should invoke the method
+     * {@link com.tailf.ned.NedWorker#prepareDryResponse(String)
+     *   prepareDryResponse()} in <code>NedWorker w</code>
+     * when the operation is completed.
+     *
+     * If the functionality is not supported or an error is detected
+     * answer this through a call to
+     * {@link com.tailf.ned.NedWorker#error(int,String,String) error()}
+     * in <code>NedWorker w</code>.
+     *
+     * @param w
+     *    The NedWorker instance currently responsible for driving the
+     *    communication
+     *    between NCS and the device. This NedWorker instance should be
+     *    used when communicating with the NCS, ie for sending responses,
+     *    errors, and trace messages. It is also implements the
+     *    {@link NedTracer}
+     *    API and can be used in, for example, the {@link SSHSession}
+     *    as a tracer.
+     *
+     * @param ops
+     *    Edit operations representing the changes to the configuration.
+     */
+    public void prepareDry(NedWorker worker, NedEditOp[] ops)
+        throws NedException {
+
+        LOGGER.info("PREPARE DRY <==");
+        try {
+            StringBuilder dryRun = new StringBuilder();
+            edit(worker, ops, dryRun);
+            worker.prepareDryResponse(dryRun.toString());
+        }
+        catch (Exception e) {
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR,
+                                   "Internal error when calling "+
+                                   "prepareDryResponse: "+
+                                   e.getMessage(),e);
+        }
+        LOGGER.info("PREPARE DRY ==> OK");
+    }
+
+    public void commit(NedWorker worker, int timeout)
+        throws NedException {
+        LOGGER.info("COMMIT <==" + this.simStates.size());
+        try {
+            for (SimState simstate : this.simStates.values()) {
+                LOGGER.info("COMMIT: "+simstate.name+ " " + simstate.action);
+                switch (simstate.action) {
+                case "NONE":
+                    String startnodes = null;
+                    String stopnodes = null;
+                    for (NodeState nodestate : simstate.actionNodes.values()) {
+                        if (nodestate.action == "START") {
+                            if (startnodes == null) startnodes = nodestate.name;
+                            else startnodes = ","+nodestate.name;
+                        }
+                        if (nodestate.action == "STOP") {
+                            if (stopnodes == null) stopnodes = nodestate.name;
+                            else stopnodes = ","+nodestate.name;
+                        }
+                    }
+                    if (startnodes != null) {
+                        comms.execRequest(VirlComms.RequestType.PUT, 
+                            "/update/"+simstate.name+"/start?nodes="+startnodes, 
+                            null, false);
+                    }
+                    if (stopnodes != null) {
+                        comms.execRequest(VirlComms.RequestType.PUT, 
+                            "/update/"+simstate.name+"/stop?nodes="+stopnodes, 
+                            null, false);
+                    }
+                    break;
+                case "START":
+                    comms.execRequest(VirlComms.RequestType.POST, 
+                            "/launch?session="+simstate.name, simstate.toXML(), false);
+                    break;
+                case "STOP":
+                    comms.execRequest(VirlComms.RequestType.GET, 
+                            "/stop/"+simstate.name, 
+                            null, false);
+                    break;
+                case "RESTART":
+                    comms.execRequest(VirlComms.RequestType.GET, 
+                            "/stop/"+simstate.name+"?wait=30", 
+                            null, false);
+                    comms.execRequest(VirlComms.RequestType.POST, 
+                            "/launch?session="+simstate.name, simstate.toXML(), false);
+                    break;
+                }
+            }
+            LOGGER.info("COMMIT ==>");
+            worker.commitResponse();
+        } catch (IOException e) {
+            worker.error(NedEditOp.MODIFIED, NedErrorCode.NED_EXTERNAL_ERROR, e.getMessage());
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, 
+                e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Is invoked by NCS to abort the configuration to a previous state.
+     *
+     * @param w is the processing worker. It should be used for sending
+     * responses to NCS. * @param data is the commands for taking the config
+     * back to the previous
+     * state. */
+
+    public void abort(NedWorker worker , NedEditOp[] ops)
+        throws NedException, IOException {
+        LOGGER.info("ABORT <==");
+        //edit(ops);
+        worker.abortResponse();
+        LOGGER.info("ABORT ==> OK");
+    }
+
+
+    public void revert(NedWorker worker , NedEditOp[] ops)
+        throws NedException, IOException {
+        LOGGER.info("REVERT <==");
+        //edit(ops);
+        worker.revertResponse();
+        LOGGER.info("REVERT ==> OK");
+    }
+
+
+    public void persist(NedWorker worker)
+        throws NedException, IOException {
+        LOGGER.info("PERSIST <==");
+        worker.persistResponse();
+
+    }
+
+    public void close(NedWorker worker)
+        throws NedException, IOException {
+        close();
+    }
+
+    public void close() {
+        LOGGER.info("CLOSE <==");
+        try {
+            if (maapi != null)
+                ResourceManager.unregisterResources(this);
+        }
+        catch (Exception e) {
+            ;
+        }
+        LOGGER.info("CLOSE ==> OK");
+    }
+
+    public void edit(NedWorker worker, NedEditOp[] ops)
+        throws NedException, Exception {
+        edit(worker, ops, null);
+    }
+
+    public void edit(NedWorker worker, NedEditOp[] ops, StringBuilder dryRun)
+        throws NedException, Exception {
+
+        if (maapi == null)
+            maapi = ResourceManager.getMaapiResource(this, Scope.INSTANCE);
+        maapi.startUserSession("system",
+                                InetAddress.getByName("localhost"),
+                                "system",
+                                new String[] { "admin" },
+                                MaapiUserSessionFlag.PROTO_TCP);
+        maapi.attach(worker.getToTransactionId(), new Ncs().hash(), worker.getUsid());
+        NavuContainer root = new NavuContainer(maapi, worker.getToTransactionId(), new Ncs().hash());
+        this.simStates = new HashMap<String, SimState>();
+        try {
+            for (NedEditOp op: ops) {
+                LOGGER.debug("OPERATION: " + op);
+                switch (op.getOperation()) {
+                case NedEditOp.CREATED:
+                    create(root, op, dryRun);
+                    break;
+                case NedEditOp.DELETED:
+                    delete(root, op, dryRun);
+                    break;
+                case NedEditOp.MODIFIED:
+                    modified(root, op, dryRun);
+                    break;
+                case NedEditOp.MOVED:
+                    break;
+                case NedEditOp.VALUE_SET:
+                    valueSet(root, op, dryRun);
+                    break;
+                case NedEditOp.DEFAULT_SET:
+                    defaultSet(op, dryRun);
+                    break;
+                default:
+                    LOGGER.debug("OPERATION NOT SUPPORTED");
+                }
+            }
+            if (dryRun != null) {
+                for (SimState simstate : this.simStates.values()) {
+                    LOGGER.info("DRYRUN: "+simstate.name+ " " + simstate.action);
+                    switch (simstate.action) {
+                    case "NONE":
+                        String startnodes = null;
+                        String stopnodes = null;
+                        for (NodeState nodestate : simstate.actionNodes.values()) {
+                            if (nodestate.action == "START") {
+                                if (startnodes == null) startnodes = nodestate.name;
+                                else startnodes = ","+nodestate.name;
+                            }
+                            if (nodestate.action == "STOP") {
+                                if (stopnodes == null) stopnodes = nodestate.name;
+                                else stopnodes = ","+nodestate.name;
+                            }
+                        }
+                        if (startnodes != null) {
+                            dryRun.append(comms.execRequest(VirlComms.RequestType.PUT, 
+                                "/update/"+simstate.name+"/start?nodes="+startnodes, 
+                                null, true)+"\n");
+                        }
+                        if (stopnodes != null) {
+                            dryRun.append(comms.execRequest(VirlComms.RequestType.PUT, 
+                                "/update/"+simstate.name+"/stop?nodes="+stopnodes, 
+                                null, true)+"\n");
+                        }
+                        break;
+                    case "START":
+                        dryRun.append(comms.execRequest(VirlComms.RequestType.POST, 
+                                "/launch?session="+simstate.name, simstate.toXML(), true)+"\n \n");
+                        break;
+                    case "STOP":
+                        dryRun.append(comms.execRequest(VirlComms.RequestType.GET, 
+                                "/stop/"+simstate.name, 
+                                null, true)+"\n \n");
+                        break;
+                    case "RESTART":
+                        dryRun.append(comms.execRequest(VirlComms.RequestType.GET, 
+                                "/stop/"+simstate.name+"?wait=30", 
+                                null, true)+"\n \n");
+                        dryRun.append(comms.execRequest(VirlComms.RequestType.POST, 
+                                "/launch?session="+simstate.name, simstate.toXML(), true)+"\n \n");
+                        break;
+                    }
+                } 
+            }
+        maapi.detach(worker.getToTransactionId());
+
+        } catch (Exception e) {
+            throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, 
+                e.getMessage(), e);
+        }
+    }
+
+    private ArrayList<ConfObject> getkeypath(NedEditOp op) throws NedException {
+        try {
+            ConfPath cp = op.getPath();
+            ArrayList<ConfObject> keypath = new ArrayList<ConfObject> (Arrays.asList(cp.getKP()));
+            for (ConfObject k : keypath) {
+            }
+            return keypath;
         } catch (Exception e) {
             throw new NedException(NedErrorCode.NED_INTERNAL_ERROR,
                                    "Internal error, cannot get key path: "
                                    +e.getMessage());
         }
-        return kp;
     }
 
-    public void create(NedEditOp op, StringBuilder dryRun)
-        throws NedException  {
+    private String getSimName(ArrayList<ConfObject> keypath) {
+        return keypath.get(keypath.size()-2).toString().replace("{","").replace("}","");
+    }
+    private void addSimState(NavuContainer root, ArrayList<ConfObject> keypath, String state) throws NedException {
+        String simName = getSimName(keypath);
+        if (! this.simStates.containsKey(simName)) { 
+            try {
+                NavuContainer device = root.container(Ncs._devices).list(Ncs._device).elem(deviceName);
+                NavuContainer sim = device.container(Ncs._config).list(ciscovirl._simulation).elem(simName);
+                SimState simstate = new SimState(sim);
+                simstate.action = state;
+                this.simStates.put(simName, simstate);
+            } catch (NavuException e) {
+                throw new NedException(NedErrorCode.NED_INTERNAL_ERROR, e.getMessage());
+            }
+        }
+    }
+    private String keyValue(ConfKey key) {
+        return key.toString().replace("{","").replace("}","");
+    }
 
-        ConfObject[] kp = getKP(op);
-        ConfKey key = (ConfKey)kp[0];
-        int i = ((ConfInt32)key.elementAt(0)).intValue();
-        if (dryRun == null) {
-            device.rows.add(new Row(i));
+    private SimState buildSimulation (ArrayDeque<ConfObject> keyqueue) {
+        ConfKey key = null;
+        ConfTag tag = null;
+        if (keyqueue.peek() instanceof ConfTag) {
+            tag = (ConfTag)keyqueue.pop();
         } else {
-            dryRun.append("new Row[");
-            dryRun.append(i);
-            dryRun.append("]");
-            dryRun.append('\n');
+            key = (ConfKey)keyqueue.pop();
+            tag = (ConfTag)keyqueue.pop();
+        }
+        SimState sim = null;
+        if (! keyqueue.isEmpty()) sim = buildSimulation(keyqueue.clone());
+        LOGGER.info("BUILD tag: "+tag+" key: "+key);
+        switch (tag.getTagHash()) {
+        case ciscovirl._simulation:
+            sim = this.simStates.get(keyValue(key));
+            if (sim == null) {
+                LOGGER.info("Create Simulation: ");
+                sim = new SimState(keyValue(key));
+                this.simStates.put(keyValue(key), sim);
+            }
+            break;
+        case ciscovirl._extensions:
+            LOGGER.info("Create Extensions: ");
+            ConfKey parentkey = (ConfKey)keyqueue.pop();
+            ConfTag parenttag = (ConfTag)keyqueue.pop();
+            if (parenttag.getTagHash() == ciscovirl._simulation) {
+                // This is a simulation extension
+                if (sim.extensions == null) sim.extensions = new Extensions();
+            } else {
+                // This is a node extension
+                ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
+                com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(parentkey)));
+                if (node.extensions == null) node.extensions = new Extensions();
+            }
+            break;
+        case ciscovirl._entry:
+            LOGGER.info("Create Entry: ");
+            ConfTag eparenttag = (ConfTag)keyqueue.pop(); // pop extensions off
+            ConfKey eparentkey = (ConfKey)keyqueue.pop(); // get grandparent
+            eparenttag = (ConfTag)keyqueue.pop();
+            if (eparenttag.getTagHash() == ciscovirl._simulation) {
+                // This is a simulation extension entry
+                sim.extensions.entrys.add(new Entry(keyValue(key)));
+            } else {
+                // This is a node extension
+                ArrayList<com.example.ciscovirl.Node> nodes = sim.nodes;
+                com.example.ciscovirl.Node node = nodes.get(nodes.indexOf(keyValue(eparentkey)));
+                node.extensions.entrys.add(new Entry(keyValue(key)));
+            }
+            break;
+        case ciscovirl._node:
+            LOGGER.info("Create Node: " + keyValue(key));
+            LOGGER.info("Create Node: " + sim.nodes.size());
+            sim.nodes.add(new com.example.ciscovirl.Node(keyValue(key), new Integer(sim.nodes.size())));
+            break;
+        case ciscovirl._connection:
+            break;
+        }
+        return sim;
+    }
+    public void create(NavuContainer root, NedEditOp op, StringBuilder dryRun) throws NedException {
+        ArrayList<ConfObject> keypath = getkeypath(op);
+        ConfKey key = (ConfKey)keypath.get(0);
+        ConfTag tag = (ConfTag)keypath.get(1);
+        String simName = getSimName(keypath);
+
+        if (tag.getTagHash() == ciscovirl._simulation) {
+            // This is a newly created simulation, load all the details from CDB new state
+            LOGGER.info("Creating Simulation... ");
+            addSimState(root, keypath, "START");
+        }
+    }
+    public void modified(NavuContainer root, NedEditOp op, StringBuilder dryRun) throws NedException {
+        ArrayList<ConfObject> keypath = getkeypath(op);
+        ConfTag tag = null;
+        ConfObject obj = keypath.get(0);
+        if (obj instanceof ConfTag) tag = (ConfTag) obj;
+        else tag = (ConfTag)keypath.get(1);
+        if (tag.getTagHash() == ciscovirl._simulation) {
+            // This is a newly created simulation, load all the details from CDB new state
+            LOGGER.info("Modifying Simulation... ");
+            addSimState(root, keypath, "NONE");
         }
     }
 
-    public void valueSet(NedEditOp op, StringBuilder dryRun)
-        throws NedException  {
-        ConfObject[] kp = getKP(op);
-        ConfKey key = (ConfKey)kp[1];
-        ConfTag tag = (ConfTag)kp[0];
-        Row r = device.getRow(key);
+    public void valueSet(NavuContainer root, NedEditOp op, StringBuilder dryRun)
+        throws Exception  {
+        ArrayList<ConfObject> keypath = getkeypath(op);
+        ConfKey key = (ConfKey)keypath.get(1);
+        ConfTag tag = (ConfTag)keypath.get(0);
+        ConfTag nodeStateTag = new ConfTag("cisco-virl", "state");
+        String simName = getSimName(keypath);
+        SimState simstate = simStates.get(simName);
+        if (simstate.action.equals("START") || simstate.action.equals("RESTART")) {
+            // We have already loaded all the details
+            return;
+        }
 
-        if (tag.getTag().compareTo("x") == 0) {
-            ConfUInt32 v = (ConfUInt32) op.getValue();
-            if (dryRun == null) {
-                r.x = (int)v.longValue();
-            } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].x = ");
-                dryRun.append(v);
-                dryRun.append('\n');
-            }
-        }
-        else if (tag.getTag().compareTo("y") == 0) {
-            ConfInt8 v = (ConfInt8) op.getValue();
-            if (dryRun == null) {
-                r.y = v.intValue();
-            } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].y = ");
-                dryRun.append(v);
-                dryRun.append('\n');
-            }
-        }
-        else if (tag.getTag().compareTo("z") == 0) {
-            ConfInt8 v = (ConfInt8) op.getValue();
-            if (dryRun == null) {
-                r.z = v.intValue();
-            } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].z = ");
-                dryRun.append(v);
-                dryRun.append('\n');
-            }
-        }
-        else if (tag.getTag().compareTo("e") == 0) {
-
-            MaapiSchemas.CSNode ecs = ciscovirlNed.schemas.findCSNode(
-                    ciscovirlNed.cfgCs, ciscovirl.uri, "row");
-            ecs = ciscovirlNed.schemas.findCSNode(ecs, ciscovirl.uri, "e");
-            ConfValue v = (ConfValue)op.getValue();
-            String str = ciscovirlNed.schemas.valueToString(ecs.getType(), v);
-            if (dryRun == null) {
-                if (str.compareTo("Up") == 0) {
-                    r.e = Direction.Up;
-                } else if (str.compareTo("Down") == 0) {
-                    r.e = Direction.Down;
+        if (!tag.equals(nodeStateTag)) {
+            LOGGER.info("Setting Simulation to Restart");
+            simstate.setRestart();
+        } else {
+            LOGGER.info("NODE STATE VALUE: "+op.getValue());
+            if (op.getValue().toString().equals("ABSENT")) {
+                NodeState nodestate = new NodeState(key.elementAt(0).toString(), "STOP");
+                if (!simstate.actionNodes.containsKey(nodestate.name)) {
+                    LOGGER.info("Setting Node to Stop");
+                    simstate.actionNodes.put(nodestate.name, nodestate);
                 }
             } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].e = ");
-                dryRun.append(str);
-                dryRun.append('\n');
+                NodeState nodestate = new NodeState(key.elementAt(0).toString(), "START");
+                LOGGER.info("Setting Node to Start");
+                simstate.actionNodes.put(nodestate.name, nodestate);
             }
         }
     }
 
     public void defaultSet(NedEditOp op, StringBuilder dryRun)
         throws NedException  {
-        ConfObject[] kp = getKP(op);
-        LOGGER.info("default set for " + op.getPath());
-        ConfKey key = (ConfKey)kp[1];
-        ConfTag tag = (ConfTag)kp[0];
-        Row r = device.getRow(key);
+        ArrayList<ConfObject> keypath = getkeypath(op);
+        ConfKey key = (ConfKey)keypath.get(0);
+        LOGGER.info("Default KEY: " + op.getPath());
+    }
 
-        if (tag.getTagHash() == ciscovirl._y) {
-            if (dryRun == null) {
-                r.y =  Device.default_y;
+    public void delete(NavuContainer root, NedEditOp op, StringBuilder dryRun)
+        throws NedException  {
+        ArrayList<ConfObject> keypath = getkeypath(op);
+        ConfTag tag = null;
+        ConfObject obj = keypath.get(0);
+        if (obj instanceof ConfTag) tag = (ConfTag) obj;
+        else tag = (ConfTag)keypath.get(1);
+        LOGGER.info("DELETE TAG: "+tag.toString());
+        if (tag.getTagHash() == ciscovirl._simulation) {
+            LOGGER.info("Deleting Simulation... ");
+            String simName = getSimName(keypath);
+            if (! this.simStates.containsKey(simName)) { 
+                SimState simstate = new SimState(simName);
+                simstate.action = "STOP";
+                this.simStates.put(simName, simstate);
             } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].y = ");
-                dryRun.append(Device.default_y);
-                dryRun.append('\n');
-            }
-        } else if (tag.getTagHash() == ciscovirl._z) {
-            if (dryRun == null) {
-                r.z = Device.default_z;
-            } else {
-                dryRun.append("Row[");
-                dryRun.append(r.k);
-                dryRun.append("].z = ");
-                dryRun.append(Device.default_z);
-                dryRun.append('\n');
+                this.simStates.get(simName).action ="STOP";
             }
         }
     }
 
-    public void delete(NedEditOp op, StringBuilder dryRun)
-        throws NedException  {
-        ConfObject[] kp = getKP(op);
-        if (kp[0] instanceof ConfKey) {
-            ConfKey key = (ConfKey)kp[0];
-            Row r = device.getRow(key);
-            device.rows.remove(r);
-            if (dryRun == null) {
-                device.rows.remove(r);
-            } else {
-                dryRun.append("delete Row[");
-                dryRun.append(r.k);
-                dryRun.append("]");
-                dryRun.append('\n');
-            }
-        } else if (kp[1] instanceof ConfKey) {
-            ConfKey key = (ConfKey)kp[1];
-            ConfTag tag = (ConfTag)kp[0];
-            Row r = device.getRow(key);
-            if (dryRun != null) {
-                dryRun.append("delete Row[");
-                dryRun.append(r.k);
-                dryRun.append("].");
-                dryRun.append(tag.getTag());
-                dryRun.append('\n');
-            } else {
-                if (tag.getTag().compareTo("x") == 0) {
-                    r.x = 0;
-                    r.xIsset = false;
-                } else if (tag.getTag().compareTo("e") == 0) {
-                    r.e = Direction.NotUsed;
-                }
-            }
-        }
-    }*/
+
+    public void getTransId(NedWorker w) throws NedException, IOException {
+        w.error(NedCmd.GET_TRANS_ID, "getTransId", "not supported");
+    }
+
 }

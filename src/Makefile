@@ -1,5 +1,5 @@
 all: javac
-.PHONY: all .FORCE
+.PHONY: all
 
 # Include standard NCS examples build definitions and rules
 include $(NCS_DIR)/src/ncs/build/include.ncs.mk
@@ -34,6 +34,7 @@ fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl-stats.fxs $(NFXS)/cisco-virl.fxs $(
 
 $(PYTHONSRC): .FORCE
 	python -m py_compile $@
+.PHONY: .FORCE
 
 $(DIRS):
 	mkdir -p $@
@@ -41,7 +42,6 @@ $(DIRS):
 $(NFXS)/cisco-virl-stats.fxs: yang/cisco-virl-stats.yang
 	$(NCSC) --ncs-compile-module $< \
 	        --ncs-device-dir ncsc-out \
-	        --ncs-skip-template \
 	        --ncs-device-type generic-ned && cp $@ ../load-dir
 	$(NCSC) $(JFLAGS)/ciscovirlStats.java $@
 

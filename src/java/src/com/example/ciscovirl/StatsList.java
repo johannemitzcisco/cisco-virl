@@ -12,5 +12,5 @@ interface StatsList {
 	 static boolean isStatsListPath(ConfPath path) {return false;};
 	 static String getStatsListURL(ConfPath path) {return null;};
 	 static String getStatsListJsonPath(ConfPath path) {return null;};
-	 abstract void saveToNSOLiveStatus(Maapi maappi, int tHandle, ConfPath path) throws Exception ;
+	 abstract void saveToNSO(Maapi maappi, int tHandle, ConfPath path) throws Exception ;
 } 

@@ -8,6 +8,7 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -39,6 +40,9 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import com.tailf.ned.NedException;
+import com.tailf.ned.NedErrorCode;
+
 public class VirlComms {
     private CloseableHttpClient httpclient;
     private CredentialsProvider credsProvider;
@@ -47,7 +51,7 @@ public class VirlComms {
     private ciscovirlNed ned;
 
     public enum RequestType {
-        GET, POST;
+        PUT, GET, POST;
     }
 
 	public VirlComms(ciscovirlNed ned, InetAddress ip, int port, String username, String password) {
@@ -63,57 +67,82 @@ public class VirlComms {
                 .setDefaultCredentialsProvider(credsProvider)
                 .build();
     }
-    public String execRequest(Object requestType, String requestURL, String requestPayload) throws Exception {
-        connect();
-        String requestString = baseAPIURL+requestURL;
-System.out.println("EXEC ("+requestType.toString()+") REQUEST: " + requestURL);
+    public String execRequest(Object requestType, String requestURL, String requestPayload, boolean dryRun) throws NedException {
         try {
-            String responseStr = null;
-            CloseableHttpResponse response = null;
-            if (requestType == RequestType.GET) {
-                HttpGet httpget = new HttpGet(requestString);
-                try {
-                    response = httpclient.execute(httpget);
-                    responseStr = EntityUtils.toString(response.getEntity());
-                    if (response.getStatusLine().getStatusCode() != 200) {
-System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
-                        throw new Exception(response.getStatusLine().toString());
+            connect();
+            String requestString = baseAPIURL+requestURL;
+//    System.out.println("EXEC ("+requestType.toString()+") REQUEST: " + requestURL);
+            try {
+                String responseStr = null;
+                CloseableHttpResponse response = null;
+                if (requestType == RequestType.PUT) {
+                    HttpPut httput = new HttpPut(requestString);
+                    if (dryRun) return httput.toString();
+                    try {
+                        response = httpclient.execute(httput);
+                        responseStr = EntityUtils.toString(response.getEntity());
+                        if (response.getStatusLine().getStatusCode() != 200) {
+    System.out.println("REQUEST("+httput.getURI().toString());
+    System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
+                            throw new NedException(NedErrorCode.CONNECT_CONNECTION_REFUSED, response.getStatusLine().toString());
+                        }
+                    } finally {
+                        response.close();
                     }
-                } finally {
-                    response.close();
-                }
-            } else if  (requestType == RequestType.POST) {
-                HttpPost httppost = new HttpPost(requestString);
-                if (requestPayload != null) {
-                    StringEntity payload = new StringEntity(requestPayload, ContentType.APPLICATION_XML);
-                    httppost.setEntity(payload);
-                }
-                try {
-                    response = httpclient.execute(httppost);
-                    responseStr = EntityUtils.toString(response.getEntity());
-                    if (response.getStatusLine().getStatusCode() != 200) {
-System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
-System.out.println("REQUEST PAYLOAD:\n" + requestPayload);
-                        throw new Exception(response.getStatusLine().toString());
+                } else if (requestType == RequestType.GET) {
+                    HttpGet httpget = new HttpGet(requestString);
+                    if (dryRun) return httpget.toString();
+                    try {
+                        response = httpclient.execute(httpget);
+                        responseStr = EntityUtils.toString(response.getEntity());
+                        if (response.getStatusLine().getStatusCode() != 200) {
+    System.out.println("REQUEST("+httpget.getURI().toString());
+    System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
+                            throw new NedException(NedErrorCode.CONNECT_CONNECTION_REFUSED, response.getStatusLine().toString());
+                        }
+                    } finally {
+                        response.close();
                     }
-                } finally {
-                    response.close();
+                } else if  (requestType == RequestType.POST) {
+                    HttpPost httppost = new HttpPost(requestString);
+                    if (dryRun) return httppost.toString() + "\n" + requestPayload;
+                    if (requestPayload != null) {
+                        StringEntity payload = new StringEntity(requestPayload, ContentType.APPLICATION_XML);
+                        httppost.setEntity(payload);
+                    }
+                    try {
+                        response = httpclient.execute(httppost);
+                        responseStr = EntityUtils.toString(response.getEntity());
+                        if (response.getStatusLine().getStatusCode() != 200) {
+    System.out.println("REQUEST("+httppost.getURI().toString());
+    System.out.println("RESPONSE CODE ("+response.getStatusLine()+") RESPONSE:\n" + responseStr);
+    System.out.println("REQUEST PAYLOAD:\n" + requestPayload);
+                            throw new NedException(NedErrorCode.CONNECT_CONNECTION_REFUSED, response.getStatusLine().toString());
+                        }
+                    } finally {
+                        response.close();
+                    }
                 }
+                return responseStr;
+            } finally {
+                httpclient.close();
             }
-            return responseStr;
-        } finally {
-            httpclient.close();
+        } catch (IOException e) {
+            throw new NedException(NedErrorCode.CONNECT_CONNECTION_REFUSED, "IO Communication problem", e);
         }
     }
     public String execRequest(Object requestType, String requestURL) throws Exception {
-        return execRequest(requestType, requestURL, null);
+        return execRequest(requestType, requestURL, null, false);
+    }
+    public String execRequest(Object requestType, String requestURL, String requestPayload) throws Exception {
+        return execRequest(requestType, requestURL, requestPayload, false);
     }
     public Document requestXMLData (String urlSuffix) throws Exception {
         String xml = execRequest(RequestType.GET, urlSuffix);
         return convertStringToDocument(xml);
     }
     private JsonObject requestJSONData (Object requestType, String urlSuffix, String jsonPath, String payload) throws Exception {
-        String json = execRequest(requestType, urlSuffix, payload);
+        String json = execRequest(requestType, urlSuffix, payload, false);
 System.out.println("RESPONSE:\n" + json);
         JsonObject retJsonObj = new JsonParser().parse(json).getAsJsonObject();
         if (jsonPath == null) return retJsonObj;

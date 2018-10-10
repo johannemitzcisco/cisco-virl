@@ -12,6 +12,11 @@ module cisco-virl {
     base ned:generic-ned-id;
   }
 
+  list simulation {
+    key "name";
+    uses cisco-virl-stats:topology-grouping;
+  }
+
   container commands {
     tailf:action Start-Simulation {
       tailf:actionpoint ncsinternal {
@@ -35,7 +40,6 @@ module cisco-virl {
     }
 
     tailf:action Stop-Simulation {
-      tailf:display-when "not(../ncs:module) or ../ncs:module[ncs:name='cisco-virl']";
       tailf:actionpoint ncsinternal {
         tailf:internal;
       }

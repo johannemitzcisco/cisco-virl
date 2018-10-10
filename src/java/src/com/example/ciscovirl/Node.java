@@ -1,12 +1,14 @@
 package com.example.ciscovirl;
 
+import com.example.ciscovirl.namespaces.*;
+
 import java.util.ArrayList;
 
 import com.tailf.maapi.Maapi;
 import com.tailf.conf.ConfPath;
-// import com.tailf.conf.ConfValue;
-// import com.tailf.conf.ConfBuf;
-// import com.tailf.conf.ConfUInt32;
+import com.tailf.navu.NavuContainer;
+import com.tailf.navu.NavuNode;
+import com.tailf.navu.NavuException;
 
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Element;
@@ -23,23 +25,57 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class Node implements StatsList {
-    private Topology topology;
     private Integer connectionIndex;
-    private String name;
+    public String name;
     private String type;
     private String subtype;
     private String state;
     private String excludeFromLaunch = "false";
     private String location = "50,50";
-    private Extensions extensions;
+    public Extensions extensions;
     @SerializedName("interface") public ArrayList<Interface> interfaces;
 
-	public Node(Element topoDeviceNode, int index) throws Exception {
+    private String startXML = "<node name=\"%s\" type=\"%s\" subtype=\"%s\" location=\"%s\"> \n";
+    private String endXml = "</node> \n";
+
+    public String toXML() {
+        String xml = String.format(startXML, this.name, this.type, this.subtype, this.location);
+        for (Interface intf : interfaces) {
+            xml = xml + intf.toXML();
+        }
+        xml = xml + this.endXml;
+        return xml;
+    }
+    public Node() {
         this.interfaces = new ArrayList<Interface>();
+    }
+    public Node(String name, Integer connectionIndex) {
+        this();
+        this.name = name;
+        this.connectionIndex = connectionIndex;
+    }
+    public Node(NavuNode nodeModel) throws NavuException {
+        this();
+        if (nodeModel.leaf(ciscovirl._connection_index).valueAsString() != null) {
+            this.connectionIndex = new Integer(nodeModel.leaf(ciscovirl._connection_index).valueAsString());
+        }
+        this.name = nodeModel.leaf(ciscovirl._name).valueAsString();
+        this.type = nodeModel.leaf(ciscovirl._type).valueAsString();
+        this.subtype = nodeModel.leaf(ciscovirl._subtype).valueAsString();
+        this.state = nodeModel.leaf(ciscovirl._state).valueAsString();
+        this.excludeFromLaunch = nodeModel.leaf(ciscovirl._excludeFromLaunch).valueAsString();
+        this.location = nodeModel.leaf(ciscovirl._location).valueAsString();
+        this.extensions = new Extensions(nodeModel.container(ciscovirl._extensions));
+        for (NavuNode intrf : nodeModel.list(ciscovirl._interface).children()) {
+            interfaces.add(new Interface(intrf));
+        }
+    }
+	public Node(Element topoDeviceNode, int index) throws Exception {
+        this();
 		this.connectionIndex = new Integer(index);
-//		VirlComms.nodeToString(topoDeviceNode);
     	NamedNodeMap attributes = topoDeviceNode.getAttributes();
     	this.name = attributes.getNamedItem("name").getTextContent();
+//System.out.print("ADD NODE: "+this.name+" "+this.connectionIndex+"\n");
     	this.type = attributes.getNamedItem("type").getTextContent();
         this.subtype = attributes.getNamedItem("subtype").getTextContent();
         if (attributes.getNamedItem("location") != null) this.location = attributes.getNamedItem("location").getTextContent();
@@ -65,11 +101,10 @@ public class Node implements StatsList {
     public static String getStatsListJsonPath(ConfPath path) {
         return Simulation.getName(path);
     }
-    public void saveToNSOLiveStatus(Maapi maapi, int tHandle, ConfPath path) throws Exception {
+    public void saveToNSO(Maapi maapi, int tHandle, ConfPath topologypath) throws Exception {
         if (this.name == null) throw new Exception("Unable to Save Node with NULL Name");
-        String newPath = path.toString();
-        if (newPath.matches(".*/topology")) newPath = newPath + "/node"; // Call came from Topology, add node Node
-        ConfPath nodePath = new ConfPath(newPath+"{"+this.name+"}");
+        if (!this.isStatsListPath(topologypath)) topologypath = new ConfPath(topologypath.toString()+"/node");
+        ConfPath nodePath = new ConfPath(topologypath.toString()+"{"+this.name+"}");
         if (!maapi.exists(tHandle, nodePath)) maapi.create(tHandle, nodePath);
         if (this.connectionIndex != null) maapi.setElem(tHandle, this.connectionIndex.toString(), new ConfPath(nodePath.toString()+"/connection-index"));
         if (this.type != null) maapi.setElem(tHandle, this.type, new ConfPath(nodePath.toString()+"/type"));
@@ -78,20 +113,21 @@ public class Node implements StatsList {
         if (this.excludeFromLaunch != null) maapi.setElem(tHandle, this.excludeFromLaunch, new ConfPath(nodePath.toString()+"/excludeFromLaunch"));
         if (this.state != null) maapi.setElem(tHandle, this.state, new ConfPath(nodePath.toString()+"/state"));
         if (this.extensions != null) 
-        	this.extensions.saveToNSOLiveStatus(maapi, tHandle, nodePath);
+        	this.extensions.saveToNSO(maapi, tHandle, nodePath);
         if (this.interfaces != null) {
 	        for (Interface i: this.interfaces) {
-    	        i.saveToNSOLiveStatus(maapi, tHandle, nodePath);
+    	        i.saveToNSO(maapi, tHandle, nodePath);
         	}
         }
     }
-    public static Node getInstanceOf(Map.Entry<String, JsonElement> entry, VirlComms comms) throws Exception {
+    public static Node getInstanceOf(Map.Entry<String, JsonElement> entry) throws Exception {
         Gson gson = new Gson();
         Node node = gson.fromJson(entry.getValue(), Node.class);
         node.setName(entry.getKey());
-        // Document topologyDoc = comms.requestXMLData("/export/"+entry.getKey());
-        // node.setTopologyDoc(topologyDoc);
         return node;
+    }
+    public static Node getInstanceOf(Map.Entry<String, JsonElement> entry, VirlComms comms) throws Exception {
+        return Node.getInstanceOf(entry);
     }
     public static String getName(ConfPath path) {
         Pattern pattern = Pattern.compile("\\{(.*?)\\}");
@@ -107,136 +143,4 @@ public class Node implements StatsList {
     public String getName() {
         return this.name;
     }
-//     public static String getURLSuffix(ConfPath path) {
-//     	return "/nodes/"+Node.getSimulationID(path);
-//     }
-//     public static String getJsonRoot(ConfPath path) {
-//     	return Node.getSimulationID(path);
-//     }
-//     public Node(String name) {
-//         setName(name);
-//     }
-//     public void setTopology(Topology topology) {
-//         this.topology = topology;
-//     }
-//     public Topology getTopology() {
-//         return topology;
-//     }
-//     public void setIndex(int index) {
-//         this.index = index;
-//     }
-//     public int getIndex() {
-//         return index;
-//     }
-//     public void setName(String name) {
-//         this.name = name;
-//     }
-//     public String getName() {
-//         return this.name;
-//     }
-//     public void setState(String state) {
-//         this.state = state;
-//     }
-//     public String getState() {
-//         return state;
-//     }
-//     public void setExtensions(Extensions extensions) {
-//         this.extensions = extensions;
-//     }
-//     public Extensions getExtensions() {
-//         return extensions;
-//     }
-//     public void setSubtype(String subtype) {
-//         this.subtype = subtype;
-//     }
-//     public String getSubtype() {
-//         return this.subtype;
-//     }
-//     public void setInterface(List<Interface> interfaces) {
-//         this.interfaces = interfaces;
-//     }
-//     public List<Interface> getInterface() {
-//         return interfaces;
-//     }
-//     public String toString() {
-//         String str = "NODE: "+getName()+", "+getIndex()+", "+getState()+", "+getSubtype()+"\n"+extensions.toString();
-//         for (Interface i: interfaces) {
-//             str = str + i.toString()+"\n";
-//         }
-//         return str;
-//     }
-//     public ConfPath getConfigPath() throws Exception {
-//         return new ConfPath(topology.getConfigPath()+"/node{"+getName()+"}");
-//     }
-//     public void toNSO(ciscovirlNed ned, int tHandle, Topology topology) throws Exception {
-//         this.topology = topology;
-//         if (!ned.maapi.exists(tHandle, getConfigPath())) ned.maapi.create(tHandle, getConfigPath());
-//         ConfPath statePath = new ConfPath("/devices/device{"+topology.getSimulation().getDeviceName()+
-//             "}/live-status/simulations/simulation{"+topology.getSimulation().getName()+
-//             "}/node{"+getName()+
-//             "}/state");
-//         JsonObject simNodeData = ned.requestJSONData(Node.getURLSuffix(statePath), Node.getJsonRoot(statePath));
-//         setState(Node.getConfValueFromPath(simNodeData, statePath).toString());
-//         ned.maapi.setElem(tHandle, getState(), getConfigPath()+"/state");
-//     }
-
-
-
-//     public static boolean isPath(ConfPath path) {
-//         return (path.toString().matches(".*/node\\{.*\\}/.*[^/]") || path.toString().matches(".*/simulation\\{.*\\}/nodes/node"));
-//     }
-//     public static String getSimulationID(ConfPath path) {
-//         Pattern pattern = Pattern.compile("\\{(.*?)\\}");
-//         Matcher matcher = pattern.matcher(path.toString());
-//         matcher.find();
-//         matcher.find();
-//         return matcher.group(1);
-//     }
-//     public static String getURLSuffix(ConfPath path) {
-//     	return "/nodes/"+Node.getSimulationID(path);
-//     }
-//     public static String getJsonRoot(ConfPath path) {
-//     	return Node.getSimulationID(path);
-//     }
-//     public static String getName(ConfPath path) {
-//     	if (! Node.isPath(path)) return null;
-//         Pattern pattern = Pattern.compile("\\{(.*?)\\}");
-//         Matcher matcher = pattern.matcher(path.toString());
-//         matcher.find();
-//         matcher.find();
-//         matcher.find();
-//         return matcher.group(1);
-//     }
-//     // TODO: Throw Exeption
-//     public static ConfValue getConfValueFromPath(JsonObject nodeJson, ConfPath path) {
-//         Gson gson = new Gson();
-//         String nodeName = Node.getName(path);
-// //        System.out.println("getValueFromPath (nodeName): ""+nodeName+""");
-//         int index = 0;
-//         for (Map.Entry<String, JsonElement> entry : nodeJson.entrySet()) {
-// //	        System.out.println("getValueFromPath: Checking Entry: ""+entry.getKey()+""");
-//         	if (nodeName.equals(entry.getKey().toString())) {
-// 	            Node node = gson.fromJson(entry.getValue(), Node.class);
-// 	            node.setName(entry.getKey());
-// 		        String[] pathSplit = path.toString().split("/",0);
-// //		        System.out.println("getValueFromPath: pathSplit: "+pathSplit);
-// 		        String attributeName = pathSplit[pathSplit.length-1];
-// //		        System.out.println("getValueFromPath: Attribute to Return: "+attributeName);
-// 		        switch (attributeName) {
-// 		        	case "name" :
-// 		        		return new ConfBuf(node.getName());
-// 		        	case "index" :
-// 		        		return new ConfUInt32(node.getIndex());
-// 		        	case "state" :
-// 		        		return new ConfBuf(node.getState());
-// 		        	case "subtype" :
-// 		        		return new ConfBuf(node.getSubtype());
-// 		        	default:
-// 		        		return null;
-// 		        }
-// 	        }
-// 	        index++;
-//         }
-//         return null;
-//     }
 }

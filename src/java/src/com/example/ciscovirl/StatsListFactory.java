@@ -52,7 +52,7 @@ public class StatsListFactory {
 	public static void saveToNSO(List<StatsList> list, Maapi maappi, int tHandle, ConfPath basePath) throws Exception {
 		for (StatsList item: list) {
 System.out.println("saveToNSO Basepath: "+basePath+"==================================================================");
-			item.saveToNSOLiveStatus(maappi, tHandle, basePath);
+			item.saveToNSO(maappi, tHandle, basePath);
 		}
 	}
 } 

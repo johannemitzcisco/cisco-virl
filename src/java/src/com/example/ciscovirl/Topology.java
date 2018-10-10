@@ -1,13 +1,16 @@
 package com.example.ciscovirl;
 
+import com.example.ciscovirl.namespaces.*;
+
 import java.util.ArrayList;
 import com.google.gson.annotations.SerializedName;
 
 import com.tailf.maapi.Maapi;
 import com.tailf.conf.ConfPath;
-// import com.tailf.conf.ConfValue;
-// import com.tailf.conf.ConfBuf;
-// import com.tailf.conf.ConfUInt32;
+import com.tailf.navu.NavuContainer;
+import com.tailf.navu.NavuNode;
+import com.tailf.navu.NavuLeaf;
+import com.tailf.navu.NavuException;
 
 import java.util.Map;
 import java.util.Set;
@@ -32,22 +35,61 @@ import org.w3c.dom.NamedNodeMap;
 
 
 public class Topology {
-	private Simulation simulation;
-    private String name;
+	private Topology Topology;
+    public String name;
     private String xmlns;
     private String schemaVersion;
     private String xsiSchemaLocation;
     private String xmlnsXSI;
-    private Extensions extensions;
+    public Extensions extensions;
     @SerializedName("node") public ArrayList<com.example.ciscovirl.Node> nodes;
     @SerializedName("connection") public ArrayList<Connection> connections;
+    public ConfPath configPath;
+    private String startXML = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n"
+                            + "<topology \n"
+                            + "   xmlns=\"%s\" \n"
+                            + "   xmlns:xsi=\"%s\" schemaVersion=\"%s\" xsi:schemaLocation=\"%s\"> \n";
+    private String endXml = "</topology>";
 
-    public Topology() {
+    public String toXML() {
+        String xml = String.format(startXML,this.xmlns,this.xmlnsXSI,this.schemaVersion,this.xsiSchemaLocation);
+        xml = xml + extensions.toXML();
+        for (com.example.ciscovirl.Node node : nodes) {
+            xml = xml + node.toXML();
+        }
+        for (Connection conn : connections) {
+            xml = xml + conn.toXML();
+        }
+        xml = xml + endXml;
+        return xml;
     }
-    public Topology(String name, Document topologyDoc) throws Exception {
-        this.name = name;
+    public Topology() {
         this.nodes = new ArrayList<com.example.ciscovirl.Node>();
         this.connections = new ArrayList<Connection>();
+        this.extensions = new Extensions();
+    }
+    public Topology(String topologyName) {
+        this();
+        this.name = topologyName;
+    }
+    public Topology(NavuContainer simModel) throws NavuException {
+        this();
+        this.name = simModel.leaf(ciscovirl._name).valueAsString();
+        this.xmlns = simModel.leaf(ciscovirl._annotation_xmlns).valueAsString();
+        this.schemaVersion = simModel.leaf(ciscovirl._annotation_schemaVersion).valueAsString();
+        this.xsiSchemaLocation = simModel.leaf(ciscovirl._annotation_xsiSchemaLocation).valueAsString();
+        this.xmlnsXSI = simModel.leaf(ciscovirl._annotation_xmlnsXSI).valueAsString();
+        this.extensions = new Extensions(simModel.container(ciscovirl._extensions));
+        for (NavuNode node : simModel.list(ciscovirl._node).children()) {
+            this.nodes.add(new com.example.ciscovirl.Node(node));
+        }
+        for (NavuNode conn: simModel.list(ciscovirl._connection).children()) {
+            this.connections.add(new Connection(conn));
+        }
+    }
+    public Topology(String name, Document topologyDoc) throws Exception {
+        this();
+        this.name = name;
         NamedNodeMap attributes = topologyDoc.getDocumentElement().getAttributes();
 
         this.xmlns = attributes.getNamedItem("xmlns").getTextContent();
@@ -73,142 +115,33 @@ public class Topology {
             connections.add(new Connection(node));
         }
     }
-    public void saveToNSOLiveStatus(Maapi maapi, int tHandle, ConfPath simPath) throws Exception {
+    public void saveToNSO(Maapi maapi, int tHandle, ConfPath topologypath) throws Exception {
         if (this.name == null) throw new Exception("Unable to Save Topology with NULL Name");
-        ConfPath topoPath = new ConfPath(simPath.toString()+"/topology");
-        if (this.name != null) maapi.setElem(tHandle, this.name, new ConfPath(topoPath.toString()+"/name"));
-        if (this.xmlns != null) maapi.setElem(tHandle, this.xmlns, new ConfPath(topoPath.toString()+"/annotation-xmlns"));
-        if (this.schemaVersion != null) maapi.setElem(tHandle, this.schemaVersion, new ConfPath(topoPath.toString()+"/annotation-schemaVersion"));
-        if (this.xsiSchemaLocation != null) maapi.setElem(tHandle, this.xsiSchemaLocation, new ConfPath(topoPath.toString()+"/annotation-xsiSchemaLocation"));
+        if (!maapi.exists(tHandle, topologypath)) maapi.create(tHandle, topologypath);
+//System.out.println("TOPO NAME: "+this.name);
+        if (this.name != null) maapi.setElem(tHandle, this.name, new ConfPath(topologypath.toString()+"/name"));
+        if (this.xmlns != null) maapi.setElem(tHandle, this.xmlns, new ConfPath(topologypath.toString()+"/annotation-xmlns"));
+        if (this.schemaVersion != null) maapi.setElem(tHandle, this.schemaVersion, new ConfPath(topologypath.toString()+"/annotation-schemaVersion"));
+        if (this.xsiSchemaLocation != null) maapi.setElem(tHandle, this.xsiSchemaLocation, new ConfPath(topologypath.toString()+"/annotation-xsiSchemaLocation"));
         if (this.xmlnsXSI != null) maapi.setElem(tHandle, this.xmlnsXSI
-            , new ConfPath(topoPath.toString()+"/annotation-xmlnsXSI"));
-        this.extensions.saveToNSOLiveStatus(maapi, tHandle, new ConfPath(topoPath.toString()));
+            , new ConfPath(topologypath.toString()+"/annotation-xmlnsXSI"));
+        this.extensions.saveToNSO(maapi, tHandle, new ConfPath(topologypath.toString()));
         if (nodes != null) {
             for (com.example.ciscovirl.Node n: this.nodes) {
-                n.saveToNSOLiveStatus(maapi, tHandle, new ConfPath(topoPath.toString()));
+                n.saveToNSO(maapi, tHandle, topologypath);
             }
         }
         if (connections != null) {
             for (Connection c: this.connections) {
-                c.saveToNSOLiveStatus(maapi, tHandle, new ConfPath(topoPath.toString()));
+                c.saveToNSO(maapi, tHandle, topologypath);
             }
         }
     }
-
-    // public Topology(String name) {
-    //     setName(name);
-    // }
-    // public void setName(String name) {
-    //     System.out.println("TOPOLOGY (name): "+name);
-    //     this.name = name;
-    // }
-    // public String getName() {
-    //     return this.name;
-    // }
-    // public void setSchemaVersion(String schemaVersion) {
-    //     this.schemaVersion = schemaVersion;
-    // }
-    // public String getSchemaVersion() {
-    //     return this.schemaVersion;
-    // }
-    // public void setSimulation(Simulation simulation) {
-    //     this.simulation = simulation;
-    // }
-    // public Simulation getSimulation() {
-    //     return this.simulation;
-    // }
-
-    // public void setExtensions(Extensions extensions) {
-    //     this.extensions = extensions;
-    // }
-    // public Extensions getExtensions() {
-    //     return extensions;
-    // }
-    // public void setNodes(List<Node> nodes) {
-    //     this.nodes = nodes;
-    // }
-    // public List<Node> getNode() {
-    //     return nodes;
-    // }
-    // public void setConnection(List<Connection> connections) {
-    //     this.connections = connections;
-    // }
-    // public List<Connection> getConnection() {
-    //     return this.connections;
-    // }
-    // public String toString() {
-    // 	String str = getName()+", "+getSchemaVersion()+"\n";
-    // 	str = str + extensions.toString()+"\n";
-    // 	for (Node n: nodes) {
-    // 		str = str + n.toString()+"\n";
-    // 	}
-    // 	for (Connection c: connections) {
-    // 		str = str + c.toString()+"\n";
-    // 	}
-    //     return str;
-    // }
-    // public ConfPath getConfigPath() throws Exception {
-    // 	return new ConfPath(simulation.getConfigPath()+"/topology");
-    // }
-    // public void toNSO(ciscovirlNed ned, int tHandle, Simulation simulation) throws Exception {
-    // 	this.simulation = simulation;
-    // 	for (Node n: nodes) {
-	   //      n.toNSO(ned, tHandle, this);
-    // 	}
-    // }
-
-
-
-
-
-//     public static boolean isPath(ConfPath path) {
-//         return (path.toString().matches(".*/topology") || path.toString().matches(".*/topology\\{.*\\}/.*[^/]"));
-//     }
-//     public static String getURLSuffix(ConfPath path) {
-// //    	if (!Topology.isPath(path)) return null;
-//     	return "/list";
-//     }
-//     public static String getJsonRoot(ConfPath path) {
-//     	return "topologys";
-//     }
-//     public static String getName(ConfPath path) {
-// //    	if (! Topology.isPath(path)) return null;
-//         Pattern pattern = Pattern.compile("\\{(.*?)\\}");
-//         Matcher matcher = pattern.matcher(path.toString());
-//         matcher.find();
-//         matcher.find();
-//         return matcher.group(1);
-//     }
-//     public static ConfValue getConfValueFromPath(JsonObject simJson, ConfPath path) {
-//     	if (! Topology.isPath(path)) return null;
-//         Gson gson = new Gson();
-//         String simName = Topology.getName(path);
-// //        System.out.println("getValueFromPath (simName): '"+simName+"'");
-//         int index = 0;
-//         for (Map.Entry<String, JsonElement> entry : simJson.entrySet()) {
-// //	        System.out.println("getValueFromPath: Checking Entry: '"+entry.getKey()+"'");
-//         	if (simName.equals(entry.getKey().toString())) {
-// 	            Topology topology = gson.fromJson(entry.getValue(), Topology.class);
-// 	            topology.setName(entry.getKey());
-// 		        String[] pathSplit = path.toString().split("/",0);
-// //		        System.out.println("getValueFromPath: pathSplit: "+pathSplit);
-// 		        String attributeName = pathSplit[pathSplit.length-1];
-// //		        System.out.println("getValueFromPath: Attribute to Return: "+attributeName);
-// 		        switch (attributeName) {
-// 		        	case "name" :
-// 		        		return new ConfBuf(topology.getName());
-// 		        	case "status" :
-// 		        		return new ConfBuf(topology.getStatus());
-// 		        	case "launched" :
-// 		        		return new ConfBuf(topology.getLaunched());
-// 		        	case "expires" :
-// 		        		return new ConfBuf(topology.getExpires());
-// 		        	default:
-// 		        		return null;
-// 		        }
-// 	        }
-// 	        index++;
-//         }
-//         return null;
-//     }
+    public boolean equals(Topology topology) {
+        return this.name.equals(topology.name);
+    }
+    public void saveToNSO(Maapi maapi, int tHandle, String deviceName) throws Exception {
+        configPath = new ConfPath("/devices/device{"+deviceName+"}/config/simulation{"+this.name+"}");
+        this.saveToNSO(maapi, tHandle, configPath);
+    }
 }

@@ -7,6 +7,8 @@ module cisco-virl-design {
   import tailf-ncs { prefix ncs; }
   import cisco-virl-stats { prefix cisco-virl-stats; }
 
+  
+
   container virl {
     tailf:info "VIRL designer with services to manage VIRL topologies";
     list topology {
@@ -28,7 +30,7 @@ module cisco-virl-design {
         }
       }
     }
-    tailf:action loadDesignFromVirlServer {
+    tailf:action Load-Design-From-Virl-Simulation {
       tailf:actionpoint loadRunningVirlTopology-action;
       input {
         leaf virl-server {

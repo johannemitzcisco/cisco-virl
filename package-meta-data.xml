@@ -5,7 +5,7 @@
   <ncs-min-version>4.7</ncs-min-version>
 
   <component>
-    <name>MyDevice</name>
+    <name>VirlNED</name>
     <ned>
       <generic>
         <ned-id xmlns:n="http//com/example/ciscovirl">n:cisco-virl-id</ned-id>
@@ -18,7 +18,7 @@
   </component>
 
   <component>
-    <name>VirlDesing</name>
+    <name>VirlDesign</name>
     <application>
       <python-class-name>virl.VirlDesign.Main</python-class-name>
     </application>

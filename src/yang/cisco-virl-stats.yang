@@ -5,7 +5,27 @@ module cisco-virl-stats {
 
   import tailf-common { prefix tailf; }
 
-  grouping extensions-grouping {
+
+  grouping topology-grouping {
+    leaf name {
+      type string;
+    }
+    leaf annotation-xmlns {
+      type string;
+      default "http://www.cisco.com/VIRL";
+    }
+    leaf annotation-schemaVersion {
+      type string;
+      default "0.95";
+    }
+    leaf annotation-xsiSchemaLocation {
+      type string;
+      default "http://www.cisco.com/VIRL https://raw.github.com/CiscoVIRL/schema/v0.95/virl.xsd";
+    }
+    leaf annotation-xmlnsXSI {
+      type string;
+      default "http://www.w3.org/2001/XMLSchema-instance";
+    }
     container extensions {
       list entry {
         key "key";
@@ -20,25 +40,6 @@ module cisco-virl-stats {
         }
       }
     }
-  }
-
-  grouping topology-grouping {
-    leaf name {
-      type string;
-    }
-    leaf annotation-xmlns {
-      type string;
-    }
-    leaf annotation-schemaVersion {
-      type string;
-    }
-    leaf annotation-xsiSchemaLocation {
-      type string;
-    }
-    leaf annotation-xmlnsXSI {
-      type string;
-    }
-    uses extensions-grouping;
     list node {
       key "name";
       leaf name {
@@ -57,12 +58,26 @@ module cisco-virl-stats {
         type string;
       }
       leaf excludeFromLaunch {
-        type string;
+        type boolean;
+        default "false";
       }
       leaf location {
         type string;
       }
-      uses extensions-grouping;
+      container extensions {
+        list entry {
+          key "key";
+          leaf key {
+            type string;
+          }
+          leaf type {
+            type string;
+          }
+          leaf value {
+            type string;
+          }
+        }
+      }
       list interface {
         key "id";
         leaf id {
