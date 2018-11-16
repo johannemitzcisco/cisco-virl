@@ -58,6 +58,17 @@ import com.tailf.conf.ConfBuf;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/*
+import java.net.URI;
+import javax.websocket.ClientEndpoint;
+import javax.websocket.CloseReason;
+import javax.websocket.ContainerProvider;
+import javax.websocket.OnClose;
+import javax.websocket.OnMessage;
+import javax.websocket.OnOpen;
+import javax.websocket.Session;
+import javax.websocket.WebSocketContainer;
+*/
 
 public class ciscovirlNed extends NedGenericBase  {
     private String      deviceName;
@@ -80,6 +91,7 @@ public class ciscovirlNed extends NedGenericBase  {
 
     private VirlComms comms;
     private HashMap<String, SimState> simStates;
+//    private Tracker tracker;
 
     private class NodeState {
         public String name;
@@ -129,12 +141,52 @@ public class ciscovirlNed extends NedGenericBase  {
             return this.name.equals(simState.name);
         }
     }
+/*    @ClientEndpoint
+    private class Tracker {
+        public String url;
+        public String token;
+        Session userSession = null;
+        public Tracker() throws Exception {
+            JsonObject trackerinfo = comms.requestJSONData(VirlComms.RequestType.POST, "/tracking", "tracking", null);
+            url = trackerinfo.get("url").getAsString();
+            token = trackerinfo.get("token").getAsString();
+            try {
+                LOGGER.info("Creating WebSocket container");
+                WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+                LOGGER.info("Connecting to "+url+" with token "+token);
+                container.connectToServer(this, new URI(url));
+                LOGGER.info("Connected");
+            } catch (Exception e) {
+                LOGGER.info("Exception "+e);
+                throw e;
+            }
+        }
+        @OnOpen
+        public void onOpen(Session userSession) {
+            LOGGER.info("opening websocket");
+            this.userSession = userSession;
+        }
+        @OnClose
+        public void onClose(Session userSession, CloseReason reason) {
+            LOGGER.info("closing websocket");
+            this.userSession = null;
+        }
+        @OnMessage
+        public void onMessage(String message) {
+            LOGGER.info("WebSocket Message: "+message);
+        }
+    }
+*/
+    public void finalize() {
+        LOGGER.info("FINALIZING ciscovirlNed ==");
+    }
 
     public ciscovirlNed(){
         this(true);
     }
 
     public ciscovirlNed(boolean wantReverse){
+        LOGGER.info("STARTING ciscovirlNed ==");
         this.wantReverse = wantReverse;
     }
 
@@ -161,7 +213,7 @@ public class ciscovirlNed extends NedGenericBase  {
             this.writeTimeout = writeTimeout;
             this.wantReverse = wantReverse;
 
-            this.comms = new VirlComms(this, ip, port, worker.getRemoteUser(), worker.getPassword());
+            this.comms = new VirlComms(ip, port, worker.getRemoteUser(), worker.getPassword());
             LOGGER.info("CONNECTING <==");
 
             NedCapability capas[] = new NedCapability[1];
@@ -180,10 +232,12 @@ public class ciscovirlNed extends NedGenericBase  {
                               this.wantReverse,  // want reverse-diff
                               TransactionIdMode.NONE);
 
+//            this.tracker = new Tracker();
+
             LOGGER.info("CONNECTING ==> OK");
         }
         catch (Exception e) {
-            worker.error(NedCmd.CONNECT_GENERIC, e.getMessage()," Cntc error");
+            worker.error(NedErrorCode.NED_INTERNAL_ERROR.getValue(), e.getMessage()," Cntc error");
         }
     }
 
@@ -820,11 +874,15 @@ LOGGER.info("VALUESET: tag: "+tag.toString()+" key: "+key.toString());
             String simName = getSimName(keypath);
             if (! this.simStates.containsKey(simName)) { 
                 SimState simstate = new SimState(simName);
-                simstate.action = "STOP";
+                simstate.setStop();
                 this.simStates.put(simName, simstate);
             } else {
-                this.simStates.get(simName).action ="STOP";
+                this.simStates.get(simName).setStop();
             }
+        } else if (tag.getTagHash() == ciscovirl._node) {
+            LOGGER.info("Restarting Simulation... ");
+            String simName = getSimName(keypath);
+                this.simStates.get(simName).setRestart();
         }
     }
 

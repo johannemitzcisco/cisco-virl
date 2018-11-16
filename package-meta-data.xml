@@ -1,7 +1,7 @@
 <ncs-package xmlns="http://tail-f.com/ns/ncs-packages">
   <name>cisco-virl</name>
   <package-version>1.0</package-version>
-  <description>Skeleton for a generic NED</description>
+  <description>Virl Network Element Driver (NED)</description>
   <ncs-min-version>4.7</ncs-min-version>
 
   <component>
@@ -17,10 +17,17 @@
     </ned>
   </component>
 
-  <component>
+  <!-- component>
+    <name>VirlTracker</name>
+    <application>
+      <java-class-name>com.example.ciscovirl.VirlTracker</java-class-name>
+    </application>
+  </component -->
+
+  <!-- component>
     <name>VirlDesign</name>
     <application>
       <python-class-name>virl.VirlDesign.Main</python-class-name>
     </application>
-  </component>
+  </component -->
 </ncs-package>

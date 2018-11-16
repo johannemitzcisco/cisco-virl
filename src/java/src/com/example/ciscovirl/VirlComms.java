@@ -57,8 +57,7 @@ public class VirlComms {
         PUT, GET, POST;
     }
 
-	public VirlComms(ciscovirlNed ned, InetAddress ip, int port, String username, String password) {
-		this.ned = ned;
+	public VirlComms(InetAddress ip, int port, String username, String password) {
         this.baseAPIURL = "http://"+ip.getHostAddress()+":"+port+"/simengine/rest";
         this.credsProvider = new BasicCredentialsProvider();
         this.credsProvider.setCredentials(
@@ -155,7 +154,7 @@ public class VirlComms {
         String xml = execRequest(RequestType.GET, urlSuffix);
         return convertStringToDocument(xml);
     }
-    private JsonObject requestJSONData (Object requestType, String urlSuffix, String jsonPath, String payload) throws Exception {
+    public JsonObject requestJSONData (Object requestType, String urlSuffix, String jsonPath, String payload) throws Exception {
         String json = execRequest(requestType, urlSuffix, payload, false);
 System.out.println("RESPONSE:\n" + json);
         JsonObject retJsonObj = new JsonParser().parse(json).getAsJsonObject();

@@ -6,6 +6,7 @@
   <property name="rsc.dir" value="src/resources"/>
   <property name="sharedjar.dir" value="../../shared-jar"/>
   <property name="privatejar.dir" value="../../private-jar"/>
+  <property name="meta.dir" value="../META-INF"/>
   <property name="doc.dir" value="${build.dir}/javadoc"/>
   <property name="ncs.dir" value="${env.NCS_DIR}/java/jar"/>
   <property name="ncs.topdir" value="${env.NCS_DIR}"/>
@@ -40,7 +41,9 @@
     <jar destfile="${privatejar.dir}/${package}.jar"
          basedir="${classes.dir}"
          excludes="**/namespaces/*.class"
-         includes="**/*.class"/>
+         includes="**/*.class">
+         <metainf dir="${meta.dir}"/>
+    </jar>
   </target>
 
   <target name="clean">

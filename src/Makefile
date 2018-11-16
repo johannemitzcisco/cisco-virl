@@ -19,6 +19,8 @@ SRC = $(wildcard yang/*.yang)
 DIRS = ncsc-out ../load-dir ../shared-jar ../private-jar \
        java/src/$(JDIR)/$(NS)
 NFXS = ncsc-out/modules/fxs
+LOADDATASRC = $(wildcard load-data/*.xml)
+LOADDATA = $(LOADDATASRC:load-data/%.xml=../load-dir/%.xml)
 
 FXS = $(SRC:yang/%.yang=../load-dir/%.fxs)
 PYTHONSRC = $(wildcard ../python/virl/*.py)
@@ -28,7 +30,7 @@ NCSCPATH   = $(YANGPATH:%=--yangpath %)
 
 
 
-fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(NFXS)/cisco-virl-stats.fxs $(FXS) 
+fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(NFXS)/cisco-virl-stats.fxs $(FXS) $(LOADDATA)
 # fxs: $(PYTHONSRC) $(DIRS) $(NFXS)/cisco-virl.fxs $(FXS)
 .PHONY: fxs
 
@@ -55,6 +57,9 @@ $(NFXS)/cisco-virl.fxs: yang/cisco-virl.yang
 ../load-dir/%.fxs: yang/%.yang
 	$(NCSC)  `ls $*-ann.yang  > /dev/null 2>&1 && echo "-a $*-ann.yang"` \
              $(NCSCPATH) -c -o $@ $<
+
+../load-dir/%.xml: load-data/%.xml
+	cp $< $@
 
 .PHONY: alljava
 
