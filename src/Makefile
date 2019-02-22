@@ -64,7 +64,7 @@ $(NFXS)/cisco-virl.fxs: yang/cisco-virl.yang
 .PHONY: alljava
 
 javac: fxs 
-	cp ../../java-lib/*.jar ../private-jar
+#	cp ../../java-lib/*.jar ../private-jar
 	cd java && ant -q all
 .PHONY: javac
 

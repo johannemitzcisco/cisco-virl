@@ -15,7 +15,7 @@
 
   <!-- Retrieving compilation compability parameters from NCS
        Remove the following row if this is not desired  -->
-  <property file="${env.NCS_DIR}/etc/ncs/java.properties" />
+  <!-- property file="${env.NCS_DIR}/etc/ncs/java.properties" / -->
   <!-- Set defaults if not set, if the above directive is removed
        or the property file is missing these values will be used -->
   <property name="ncs_java_source_ver" value="1.8"/>
