@@ -16,7 +16,8 @@ JFLAGS = --java-disable-prefix \
          --emit-java java/src/$(JDIR)/namespaces
 
 SRC = $(wildcard yang/*.yang)
-DIRS = ncsc-out ../load-dir ../shared-jar ../private-jar \
+#DIRS = ncsc-out ../load-dir ../shared-jar ../private-jar \
+DIRS = ncsc-out ../load-dir ../shared-jar \
        java/src/$(JDIR)/$(NS)
 NFXS = ncsc-out/modules/fxs
 LOADDATASRC = $(wildcard load-data/*.xml)
